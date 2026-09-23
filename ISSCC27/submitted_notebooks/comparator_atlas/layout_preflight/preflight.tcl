@@ -2,12 +2,29 @@ proc box_um {x1 y1 x2 y2} {
     box values ${x1}um ${y1}um ${x2}um ${y2}um
 }
 
-proc pin_order {} {
+proc pin_order {{pins {D G S B}}} {
     set i 1
-    foreach pin {D G S B} {
+    foreach pin $pins {
         port $pin index $i
         incr i
     }
+}
+
+proc draw_device {} {
+    set model $::env(PREFLIGHT_MODEL)
+    set parameters [dict merge [sky130::${model}_defaults] \
+        [dict create w $::env(PREFLIGHT_WIDTH) l $::env(PREFLIGHT_LENGTH) \
+            nf 1 m 1 guard 1 doports 1 topc 1 botc 0]]
+    set checked [sky130::${model}_check $parameters]
+    foreach key {w l nf m} {
+        if {[dict get $parameters $key] != [dict get $checked $key]} {
+            error "PCell changed requested $key; refusing a clamped dimension"
+        }
+    }
+    sky130::${model}_draw $checked
+    # The PCell abutment box excludes guard material; select the full physical cell.
+    property FIXED_BBOX {}
+    gate_landing
 }
 
 proc gate_landing {} {
@@ -67,42 +84,95 @@ proc connectivity {cell} {
 }
 
 proc routed_probe {cell length} {
-    findlabel D
-    set terminal [sky130::getbox]
-    set x [expr {([lindex $terminal 0] + [lindex $terminal 2]) / 2.0}]
-    set y [expr {([lindex $terminal 1] + [lindex $terminal 3]) / 2.0}]
-    # Two physical contacts on the same 3um drain create parallel loaded paths.
-    # The external port is on a separate trunk, not an ideal short alias.
-    erase labels
+    # Distinct gates and sources keep the two physical drain loads distinguishable.
+    draw_device
+    foreach pin {D G S B} {
+        findlabel $pin
+        select area label
+        setlabel text ${pin}2
+    }
+    select top cell
+    box values {*}[select bbox]
+    select area
+    move n 12um
+    select clear
+    box_um 0 0 0 0
+    draw_device
+
+    set contacts {}
+    foreach pin {D D2} {
+        findlabel $pin
+        set terminal [sky130::getbox]
+        lappend contacts [list \
+            [expr {([lindex $terminal 0] + [lindex $terminal 2]) / 2.0}] \
+            [expr {([lindex $terminal 1] + [lindex $terminal 3]) / 2.0}]]
+        erase labels
+    }
+    lassign [lindex $contacts 0] x lower_y
+    lassign [lindex $contacts 1] upper_x upper_y
+    if {abs($upper_x - $x) > 0.001 || abs($upper_y - $lower_y - 12.0) > 0.001} {
+        error "The two independently contacted drain loads were not translated correctly"
+    }
+
+    # Join both real guard-ring taps with LI outside the device cores.
+    set body_taps {}
+    foreach pin {B B2} {
+        findlabel $pin
+        set terminal [sky130::getbox]
+        lappend body_taps [list \
+            [expr {([lindex $terminal 0] + [lindex $terminal 2]) / 2.0}] \
+            [expr {([lindex $terminal 1] + [lindex $terminal 3]) / 2.0}]]
+        if {$pin eq "B2"} {erase labels}
+    }
+    lassign [lindex $body_taps 0] bx by
+    lassign [lindex $body_taps 1] bx2 by2
+    set body_x [expr {min($bx, $bx2) - 2.0}]
+    foreach tap $body_taps {
+        lassign $tap tx ty
+        box_um [expr {$body_x - 0.10}] [expr {$ty - 0.10}] \
+            [expr {$tx + 0.10}] [expr {$ty + 0.10}]
+        paint locali
+    }
+    box_um [expr {$body_x - 0.10}] [expr {$by - 0.10}] \
+        [expr {$body_x + 0.10}] [expr {$by2 + 0.10}]
+    paint locali
+
+    set y [expr {($lower_y + $upper_y) / 2.0}]
     set left [expr {$x - $length}]
     set junction [expr {$x - $length / 2.0}]
-    foreach offset {-1.0 1.0} {
-        set contact_y [expr {$y + $offset}]
-        box_um [expr {$x - 0.13}] [expr {$contact_y - 0.13}] \
-            [expr {$x + 0.13}] [expr {$contact_y + 0.13}]
+    foreach contact $contacts {
+        lassign $contact contact_x contact_y
+        box_um [expr {$contact_x - 0.13}] [expr {$contact_y - 0.13}] \
+            [expr {$contact_x + 0.13}] [expr {$contact_y + 0.13}]
         sky130::via1_draw
         box_um [expr {$junction - 0.18}] [expr {$contact_y - 0.18}] \
-            [expr {$x + 0.18}] [expr {$contact_y + 0.18}]
+            [expr {$contact_x + 0.18}] [expr {$contact_y + 0.18}]
         paint metal2
     }
     box_um [expr {$left - 0.18}] [expr {$y - 0.18}] \
         [expr {$junction + 0.18}] [expr {$y + 0.18}]
     paint metal2
-    box_um [expr {$junction - 0.18}] [expr {$y - 1.18}] \
-        [expr {$junction + 0.18}] [expr {$y + 1.18}]
+    box_um [expr {$junction - 0.18}] [expr {$lower_y - 0.18}] \
+        [expr {$junction + 0.18}] [expr {$upper_y + 0.18}]
     paint metal2
     box_um $left $y $left $y
     label D c metal2
     port make 1
-    pin_order
+    pin_order {D G S B G2 S2}
     set report [open ${cell}.route.txt w]
-    puts $report "topology: two_contact_fork"
+    puts $report "topology: two_distinct_transistor_drain_fork"
+    puts $report "device_count: 2"
+    puts $report "device_model: $::env(PREFLIGHT_MODEL)"
+    puts $report "device_w_l_um: $::env(PREFLIGHT_WIDTH) $::env(PREFLIGHT_LENGTH)"
+    puts $report "ports: D G S B G2 S2"
     puts $report "span_um: $length"
     puts $report "metal2_width_um: 0.36"
     puts $report "drain_port_um: $left $y"
     puts $report "junction_um: $junction $y"
-    puts $report "upper_contact_um: $x [expr {$y + 1.0}]"
-    puts $report "lower_contact_um: $x [expr {$y - 1.0}]"
+    puts $report "lower_contact_um: $x $lower_y"
+    puts $report "upper_contact_um: $upper_x $upper_y"
+    puts $report "body_taps_um: $body_taps"
+    puts $report "body_li_trunk_x_um: $body_x"
     close $report
     save_and_check $cell
     connectivity $cell
@@ -128,6 +198,8 @@ proc routed_probe {cell length} {
 
 proc main {} {
     if {[tech name] ne "sky130A"} {error "The genuine sky130A deck did not load"}
+    units internal
+    snap internal
     random seed 1
     drc euclidean on
     drc style drc(full)
@@ -136,19 +208,7 @@ proc main {} {
     box_um 0 0 0 0
     switch -- $::env(PREFLIGHT_MODE) {
         device {
-            set model $::env(PREFLIGHT_MODEL)
-            set w $::env(PREFLIGHT_WIDTH)
-            set l $::env(PREFLIGHT_LENGTH)
-            set parameters [dict merge [sky130::${model}_defaults] \
-                [dict create w $w l $l nf 1 m 1 guard 1 doports 1 topc 1 botc 0]]
-            set checked [sky130::${model}_check $parameters]
-            foreach key {w l nf m} {
-                if {[dict get $parameters $key] != [dict get $checked $key]} {
-                    error "PCell changed requested $key; refusing a clamped dimension"
-                }
-            }
-            sky130::${model}_draw $checked
-            gate_landing
+            draw_device
             pin_order
             save_and_check $cell
             connectivity $cell

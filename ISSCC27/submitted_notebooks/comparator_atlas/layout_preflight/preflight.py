@@ -9,7 +9,6 @@ import math
 import os
 from pathlib import Path
 import re
-import shutil
 import struct
 import subprocess
 import sys
@@ -21,6 +20,9 @@ MODELS = {
     "sky130_fd_pr__nfet_01v8_lvt": "nmos",
     "sky130_fd_pr__pfet_01v8": "pmos",
 }
+PRIMITIVE_PORTS = ["D", "G", "S", "B"]
+ROUTE_PORTS = ["D", "G", "S", "B", "G2", "S2"]
+ROUTE_DEVICE_PINS = [["D", "G", "S", "B"], ["D", "G2", "S2", "B"]]
 
 
 def require(condition: bool, message: str) -> None:
@@ -182,7 +184,9 @@ def metal1_area_at_pin_um2(mag: dict, pin: str, grid_um: float) -> float:
 
 
 def independent_reference(spec: dict, mutation: str | None = None) -> str:
-    pins, width, model = ["D", "G", "S", "B"], spec["w_um"], spec["model"]
+    pin_sets = [list(pins) for pins in spec.get("device_pins", [PRIMITIVE_PORTS])]
+    require(mutation is None or len(pin_sets) == 1, "Mutations require a primitive reference")
+    pins, width, model = pin_sets[0], spec["w_um"], spec["model"]
     if mutation == "connection":
         pins[1] = "S"
     elif mutation == "bulk":
@@ -194,33 +198,44 @@ def independent_reference(spec: dict, mutation: str | None = None) -> str:
         model = "sky130_fd_pr__nfet_01v8"
     elif mutation is not None:
         raise ValueError(f"Unknown reference mutation: {mutation}")
-    return (f"* Independently generated from devices.json; geometry is in micrometres.\n"
-            f".subckt {spec['cell']} D G S B\n"
-            f"Xreference {' '.join(pins)} {model} w={width} l={spec['l_um']} m=1\n"
+    ports = spec.get("ports", PRIMITIVE_PORTS)
+    devices = "".join(
+        f"Xreference{i} {' '.join(pins)} {model} w={width} l={spec['l_um']} m=1\n"
+        for i, pins in enumerate(pin_sets))
+    return (f"* Independent device dimensions and declared topology; geometry in micrometres.\n"
+            f".subckt {spec['cell']} {' '.join(ports)}\n"
+            f"{devices}"
             f".ends {spec['cell']}\n")
 
 
-def check_device(net: dict, spec: dict, connectivity: bool = True) -> dict:
+def check_devices(net: dict, spec: dict, connectivity: bool = True) -> list[dict]:
     require(net["cell"] == spec["cell"], f"Wrong extracted top cell: {net['cell']}")
-    require(net["ports"] == ["D", "G", "S", "B"], f"Wrong port order: {net['ports']}")
-    require(len(net["devices"]) == 1, f"Expected one real transistor: {net['devices']}")
-    device = net["devices"][0]
-    for key in ("model", "w_um", "l_um", "m"):
-        expected = spec.get(key, 1)
-        actual = device[key]
-        equal = actual == expected if key == "model" else math.isclose(
-            actual, expected, rel_tol=1e-6, abs_tol=1e-9)
-        require(equal, f"{key}: expected {expected}, extracted {actual}")
+    require(net["ports"] == spec.get("ports", PRIMITIVE_PORTS),
+            f"Wrong port order: {net['ports']}")
+    expected_pins = list(spec.get("device_pins", [PRIMITIVE_PORTS]))
+    require(len(net["devices"]) == len(expected_pins),
+            f"Expected {len(expected_pins)} real transistor(s): {net['devices']}")
+    for device in net["devices"]:
+        for key in ("model", "w_um", "l_um", "m"):
+            expected = spec.get(key, 1)
+            actual = device[key]
+            equal = actual == expected if key == "model" else math.isclose(
+                actual, expected, rel_tol=1e-6, abs_tol=1e-9)
+            require(equal, f"{key}: expected {expected}, extracted {actual}")
+        if connectivity:
+            d, g, s, b = device["pins"]
+            matches = [pins for pins in expected_pins if
+                       g == pins[1] and b == pins[3] and {d, s} == {pins[0], pins[2]}]
+            require(len(matches) == 1,
+                    f"Wrong gate/bulk/source/drain connectivity: {device['pins']}")
+            expected_pins.remove(matches[0])
     if connectivity:
-        d, g, s, b = device["pins"]
-        require(g == "G" and b == "B" and {d, s} == {"D", "S"},
-                f"Wrong gate/bulk/source/drain connectivity: {device['pins']}")
         require(not net["capacitors"] and not net["resistors"],
                 "LVS output unexpectedly contains parasitics")
-    return device
+    return net["devices"]
 
 
-def terminal_components(net: dict) -> dict:
+def terminal_components(net: dict, spec: dict) -> dict:
     """Require each physical terminal and every parasitic node to be DC-anchored."""
     components = {}
     for port in net["ports"]:
@@ -236,13 +251,17 @@ def terminal_components(net: dict) -> dict:
         require(reached.intersection(net["ports"]) == {port},
                 f"Unexpected resistive short between external ports on {port}")
         components[port] = reached
+    expected_pins = list(spec.get("device_pins", [PRIMITIVE_PORTS]))
+    require(len(net["devices"]) == len(expected_pins), "Wrong number of physical terminal loads")
     for device in net["devices"]:
         d, g, s, b = device["pins"]
-        require(g in components["G"] and b in components["B"],
-                f"Unanchored gate/body terminal: {device['pins']}")
-        require((d in components["D"] and s in components["S"]) or
-                (s in components["D"] and d in components["S"]),
-                f"Unanchored source/drain terminal: {device['pins']}")
+        matches = [pins for pins in expected_pins if
+                   g in components[pins[1]] and b in components[pins[3]] and
+                   ((d in components[pins[0]] and s in components[pins[2]]) or
+                    (s in components[pins[0]] and d in components[pins[2]]))]
+        require(len(matches) == 1,
+                f"Unanchored or misconnected physical transistor terminals: {device['pins']}")
+        expected_pins.remove(matches[0])
     anchored = set().union(*components.values())
     for item in net["resistors"] + net["capacitors"]:
         require(set(item["nodes"]) <= anchored,
@@ -250,12 +269,12 @@ def terminal_components(net: dict) -> dict:
     return components
 
 
-def rc_metrics(net: dict) -> dict:
+def rc_metrics(net: dict, spec: dict) -> dict:
     require(len(net["resistors"]) >= 2 and net["capacitors"],
             "Missing actual distributed R or extracted C")
     for item in net["resistors"] + net["capacitors"]:
         require(item["value"] > 0, f"Nonpositive parasitic: {item}")
-    components = terminal_components(net)
+    components = terminal_components(net, spec)
     reached = components["D"]
     drain_r = [r for r in net["resistors"] if set(r["nodes"]) <= reached]
     require(len(drain_r) >= 2, "External D does not reach a distributed resistance network")
@@ -264,7 +283,8 @@ def rc_metrics(net: dict) -> dict:
     require(branch_nodes, "No extracted branch junction in the multi-contact drain network")
     transistor_pins = {pin for device in net["devices"] for pin in
                        (device["pins"][0], device["pins"][2])}
-    require(bool(reached & transistor_pins), "Routed D network does not reach a transistor")
+    require(len(reached & transistor_pins) == len(net["devices"]),
+            "Routed D must reach a distinct drain endpoint for every physical transistor")
     require(bool(reached - set(net["ports"])), "No internal distributed RC nodes")
     drain_c = [c for c in net["capacitors"] if reached.intersection(c["nodes"])]
     require(drain_c, "No capacitance on the routed drain network")
@@ -320,7 +340,8 @@ def run_magic(out: Path, spec: dict, mode: str, route_length: int = 0) -> None:
             "Ambiguous/deprecated Magic command; inspect the raw tool log")
 
 
-def check_layout(out: Path, cell: str, negative: bool = False) -> dict:
+def check_layout(out: Path, cell: str, negative: bool = False,
+                 ports: list[str] | None = None) -> dict:
     mag, gds = inspect_mag(out / f"{cell}.mag"), inspect_gds(out / f"{cell}.gds")
     report = (out / f"{cell}.drc.txt").read_text()
     match = re.search(r"^count: (\d+)$", report, re.MULTILINE)
@@ -332,21 +353,25 @@ def check_layout(out: Path, cell: str, negative: bool = False) -> dict:
     require(f"PREFLIGHT_DRC_STYLE {cell} drc(full)" in log and
             'The current style is "drc(full)"' in log, "Missing raw DRC style confirmation")
     require(count > 0 if negative else count == 0, f"DRC count {count}: {report}")
-    landing = None
+    landings = {}
     if not negative:
-        require({"D", "G", "S", "B"} <= set(mag["labels"]), "Missing four terminal labels")
+        ports = PRIMITIVE_PORTS if ports is None else ports
+        require(set(ports) <= set(mag["labels"]), f"Missing terminal labels: {ports}")
         require({"65/20", "66/20", "68/20"} <= gds["geometry_by_layer"].keys(),
                 "GDS lacks active, poly, or metal1")
         scale = re.search(r"^grid_um: ([0-9.eE+-]+)$", report, re.MULTILINE)
         require(scale is not None, "Missing actual Magic grid scale")
-        landing = metal1_area_at_pin_um2(mag, "G", float(scale[1]))
-        require(landing >= 0.10, f"Connected gate metal1 area lacks margin: {landing} um2")
+        for gate in (pin for pin in ports if pin.startswith("G")):
+            landing = metal1_area_at_pin_um2(mag, gate, float(scale[1]))
+            require(landing >= 0.10,
+                    f"Connected {gate} metal1 area lacks margin: {landing} um2")
+            landings[gate] = landing
         if cell.startswith("route_"):
             require(gds["geometry_by_layer"].get("68/44", 0) >= 2 and
                     gds["geometry_by_layer"].get("69/20", 0) > 0,
                     "Branched probe lacks two physical via1 contacts and metal2")
     return {"drc_count": count, "drc_style": "drc(full)",
-            "gate_metal1_area_um2": landing, "mag": mag, "gds": gds}
+            "gate_metal1_area_um2": landings, "mag": mag, "gds": gds}
 
 
 def lvs_outcome(text: str, mutation: str | None) -> dict:
@@ -365,9 +390,11 @@ def lvs_outcome(text: str, mutation: str | None) -> dict:
 def run_lvs(out: Path, spec: dict, mutation: str | None = None) -> dict:
     cell = spec["cell"]
     layout = out / f"{cell}.lvs.spice"
-    check_device(read_spice(layout), spec)
+    layout_devices = check_devices(read_spice(layout), spec)
     ports = re.findall(r'^port "([^"]+)" (\d+) ', (out / f"{cell}.ext").read_text(), re.MULTILINE)
-    require(sorted(ports, key=lambda p: int(p[1])) == [("D", "1"), ("G", "2"), ("S", "3"), ("B", "4")],
+    expected_ports = [(pin, str(i)) for i, pin in
+                      enumerate(spec.get("ports", PRIMITIVE_PORTS), start=1)]
+    require(sorted(ports, key=lambda p: int(p[1])) == expected_ports,
             f"Missing/misordered real extraction ports: {ports}")
     suffix = mutation or "positive"
     reference = out / f"{cell}-{suffix}.reference.spice"
@@ -382,7 +409,8 @@ def run_lvs(out: Path, spec: dict, mutation: str | None = None) -> dict:
     for circuit, model in ((1, spec["model"]), (2, reference_net["devices"][0]["model"])):
         require(f"PREFLIGHT_DEVICE_CLASS {circuit} {model} {MODELS[model]}" in text,
                 f"Distinct four-terminal primitive class not asserted: {circuit} {model}")
-    return lvs_outcome(text, mutation)
+    return dict(lvs_outcome(text, mutation), layout_devices=layout_devices,
+                independent_reference_devices=reference_net["devices"])
 
 
 def main(out: Path) -> int:
@@ -399,8 +427,12 @@ def main(out: Path) -> int:
         "drc_style": "sky130A drc(full), Euclidean on",
         "pex_settings": {"threshold_milliohm": 0, "minresist_milliohm": 0,
                          "mindelay_ps": 0, "cthresh_ff": 0},
-        "route_topology": "two_contact_fork; two via1 contacts 2um apart on the same drain",
-        "route_spans_um": [20, 400],
+        "coordinate_settings": "units internal before snap internal and PCell calls",
+        "route_topology": "two_distinct_transistor_drain_fork",
+        "route_ports": ROUTE_PORTS,
+        "route_device_pins": ROUTE_DEVICE_PINS,
+        "route_device_spacing_um": 12,
+        "route_spans_um": [20, 800],
         "prior_failed_receipt": "verification_receipt.json (attempts 1/2, unchanged)",
     }
     (out / "run-context.json").write_text(json.dumps(context, indent=2) + "\n")
@@ -430,7 +462,7 @@ def main(out: Path) -> int:
             continue
         record(f"{cell}: geometry/DRC", lambda c=cell: check_layout(out, c))
         record(f"{cell}: transistor/model/W/L/body", lambda s=spec:
-               check_device(read_spice(out / f"{s['cell']}.lvs.spice"), s))
+               check_devices(read_spice(out / f"{s['cell']}.lvs.spice"), s))
         record(f"{cell}: Netgen LVS", lambda s=spec: run_lvs(out, s))
 
     negative_spec = next(spec for spec in specs if spec["cell"] == "n_lvt042_l4")
@@ -442,32 +474,33 @@ def main(out: Path) -> int:
         run_magic(out, spacing_spec, "spacing"), check_layout(out, "spacing_bad", True))[1])
 
     routes = {}
-    for cell, length in (("route_short", 20), ("route_long", 400)):
-        spec = dict(specs[0], cell=cell)
+    for cell, length in (("route_short", 20), ("route_long", 800)):
+        spec = dict(specs[0], cell=cell, ports=ROUTE_PORTS, device_pins=ROUTE_DEVICE_PINS)
 
         def make_route(s=spec, length=length):
-            shutil.copyfile(out / "n_input3.mag", out / f"{s['cell']}.mag")
             run_magic(out, s, "route", length)
             return {"route_span_um": length, "route_width_um": 0.36,
-                    "topology": "two_contact_fork", "physical_via1_contacts": 2}
+                    "topology": "two_distinct_transistor_drain_fork",
+                    "device_count": 2, "physical_via1_contacts": 2}
 
         generated = record(f"{cell}: routed extraction", make_route)
         if generated is None:
             continue
-        record(f"{cell}: geometry/DRC", lambda c=cell: check_layout(out, c))
+        record(f"{cell}: geometry/DRC", lambda s=spec:
+               check_layout(out, s["cell"], ports=s["ports"]))
         record(f"{cell}: connectivity LVS", lambda s=spec: run_lvs(out, s))
 
         def check_pex(s=spec):
             c_only = read_spice(out / f"{s['cell']}.c.spice")
             rc = read_spice(out / f"{s['cell']}.rc.spice")
-            check_device(c_only, s, connectivity=False)
-            check_device(rc, s, connectivity=False)
-            terminal_components(c_only)
+            check_devices(c_only, s, connectivity=False)
+            check_devices(rc, s, connectivity=False)
+            terminal_components(c_only, s)
             require(c_only["capacitors"] and not c_only["resistors"],
                     "C-only result missing C or mixed with R")
             require((out / f"{s['cell']}.res.ext").stat().st_size > 0,
                     "No real extresist intermediate")
-            metrics = rc_metrics(rc)
+            metrics = rc_metrics(rc, s)
             metrics["c_only_capacitor_count"] = len(c_only["capacitors"])
             metrics["c_only_capacitors"] = c_only["capacitors"]
             metrics["route_geometry"] = (out / f"{s['cell']}.route.txt").read_text()
