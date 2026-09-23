@@ -5,7 +5,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK="$(realpath -m "$1")"
 OUT="$(realpath -m "$2")"
 PREFIX="$WORK/install"
-mkdir -p "$WORK/src" "$OUT/logs" "$OUT/technology"
+mkdir -p "$WORK/src" "$OUT/logs" "$OUT/technology" "$OUT/licenses"
 unset PDK_ROOT PDKPATH
 
 fetch_source() {
@@ -31,6 +31,11 @@ fetch_source() {
     test "$(git -C "$dest" rev-parse HEAD)" = "$sha"
     printf '%s\t%s\t%s\n' "$name" "$sha" "$repo" >> "$OUT/sources.tsv"
     cp "$dest/VERSION" "$OUT/${name}-source-version.txt"
+    if [[ "$name" == netgen ]]; then
+        cp "$dest/Copying" "$OUT/licenses/$name.txt"
+    else
+        cp "$dest/LICENSE" "$OUT/licenses/$name.txt"
+    fi
 }
 
 for name in magic netgen open_pdks; do

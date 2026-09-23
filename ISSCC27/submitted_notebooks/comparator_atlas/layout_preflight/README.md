@@ -113,3 +113,12 @@ capability outcome are reported separately after inspecting downloaded evidence.
 Original harness code is MIT licensed under the parent project's license.
 Fetched third-party sources retain their own licenses. Magic, open_pdks and
 circuit Netgen are credited to their upstream projects and contributors.
+
+## Initial verification provenance
+
+Attempt 1: [run 35808864758](https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/actions/runs/35808864758),
+commit `9b194bb4fc4d6328b2546f983a71b550df084257`, failed in checkout before
+dependencies or tools ran. The checkout action's auth cleanup reported
+`No url found for submodule path ... sky130-opamp in .gitmodules`.
+This is an infrastructure failure, **not** a DRC, LVS, or PEX result.
+Only one further initial verification run is authorized.
