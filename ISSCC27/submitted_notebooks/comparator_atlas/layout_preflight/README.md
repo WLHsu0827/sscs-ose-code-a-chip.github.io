@@ -8,6 +8,55 @@ entry and its source commit `2ad1c4c2058060abdfdd42c35aa784c018f6fa67` are uncha
 No comparator DRC/LVS/PEX, foundry signoff, silicon result, density coverage, or
 antenna coverage is claimed.
 
+## Final bounded preflight result
+
+All **four authorized preflight attempts** are consumed. The final
+[run 35819766445](https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/actions/runs/35819766445),
+at [experimental commit d04703af22ca85202d12b7564545d4aec892d191](https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/commit/d04703af22ca85202d12b7564545d4aec892d191),
+executed the real tools and finished in 49 seconds with **54 PASS / 0 FAIL /
+0 skipped**. Every run has `run_attempt=1`; no fifth preflight run is authorized.
+The final receipt is `verification_followup_receipt.json`. The original
+`verification_receipt.json` and failed evidence remain unchanged.
+
+| Capability | Actual attempt-4 result |
+|---|---|
+| Pinned tools/deck | Magic 8.3.684, circuit Netgen 1.5.323, generated SKY130A 1.0.608; 91,812 KiB source/build/install total |
+| Geometry and DRC | Ten four-terminal primitives plus two routed two-device cells; nonempty active/poly/M1 geometry; all zero errors under `drc(full)` |
+| Gate landing repair | Smallest connected M1/contact union area 0.1249749944 um2, exceeding the declared 0.10 um2 threshold |
+| Native connectivity and LVS | All 12 named tops/native port lists match independent references, with exact device counts, model flavors, W/L/m and bodies |
+| Negative controls | 0.07 um M1 spacing yields two `met1.2` error regions; connection, bulk, doubled-width and SVT-for-LVT references all mismatch |
+| Separate PEX outputs | Each route has 0 R / 0 C in LVS, 0 R / 11 C in C-only, and 48 R / 22 C in real RC extraction |
+
+The 20/800 um routes each preserve a genuine three-resistor drain fork:
+`D -> D.n0 -> {D.t0, D.t1}`, reaching two distinct transistor drains.
+No resistors were inserted or split by the harness.
+
+| Route span (um) | Drain resistor values (ohm) | Drain component R sum (ohm) | Drain C sum (fF) | Total RC-netlist C (fF) |
+|---|---|---:|---:|---:|
+| 20 | 3.42516, 39.9693, 39.9693 | 83.36376 | 5.34886 | 7.23798 |
+| 800 | 136.987, 173.53, 173.53 | 484.047 | 101.18093 | 103.07005 |
+
+The long/short drain R-sum and C-sum ratios are 5.8064439512 and 18.9163541390.
+C-only totals are 5.70247/101.53424 fF. All 11 `FLOATING`-annotated capacitors in
+each RC netlist remain present and are DC-anchored through the appropriate
+resistance component. Magic's capacitance placement is retained, including its
+large port-to-body capacitor; this is not a calibrated distributed-capacitance
+ladder or a foundry-qualified RC corner.
+
+The downloaded 228,310-byte artifact ZIP matches GitHub's uploaded SHA-256:
+`92093a41b5e8d4380b4405a4ad0f6d32719f93dc5483368e28a5b14c4ae1591a`.
+All **175** manifest-listed files and the exact file set were verified, both
+after extraction and inside the archive. The manifest SHA-256 is
+`8ee8fd44493efc48b608199dd11826f4057cf5b5990e0dd6a400a0a873b00432`.
+The receipt records representative GDS/MAG/netlist/reference/log hashes;
+`artifact-sha256.json` covers every artifact. The ZIP, extracted evidence, and
+Actions log are retained in the session's persistent files area.
+
+This qualifies only the small primitive/routed toolchain experiment. It does
+not qualify any comparator or run the optional model-based simulation. A
+subsequently authorized full-comparator phase is separate from this receipt,
+this four-run budget, and the unchanged published submission.
+
 ## Reproduce on a disposable Linux host
 
 Ubuntu 24.04, Python 3 standard library, and the packages in `apt-packages.txt`
@@ -134,7 +183,7 @@ shallow, sparse fetch of this public fork at `GITHUB_SHA`, never recursive
 submodule operations. This avoids the historical dangling submodule entry that
 caused the first attempt's checkout-action credential cleanup to fail.
 
-At most two initial remote runs are authorized. CI artifacts contain the actual
+The initial authorization allowed at most two remote runs. CI artifacts contain the actual
 GDS, Magic layouts, connectivity/C/RC netlists, `.ext`/`.res.ext`, independent
 references, DRC/LVS reports, and source/deck/binary/artifact hashes. Successful
 installation alone is not a passed layout. Execution receipts and the actual
@@ -156,7 +205,9 @@ although the raw logs contain completed extraction and DRC. These warning-based
 failures are not evidence of illegal device geometry. Both drain forks reduced
 to one drain resistor (37.8702 / 135.924 ohm), so distributed-route RC and its
 acceptance comparison remained unproven. All 135 artifact-manifest entries were
-verified. Attempt 4 is the sole remaining authorized run; no fifth run is allowed.
+verified. Attempt 4 subsequently consumed the final authorized attempt and passed
+the complete matrix above. No fifth preflight run or additional triggering push
+is authorized.
 
 Original harness code is MIT licensed under the parent project's license.
 Fetched third-party sources retain their own licenses. Magic, open_pdks and
