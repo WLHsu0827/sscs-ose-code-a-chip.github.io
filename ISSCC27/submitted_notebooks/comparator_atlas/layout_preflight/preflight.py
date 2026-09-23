@@ -274,6 +274,19 @@ def run_lvs(out: Path, spec: dict, mutation: str | None = None) -> dict:
 def main(out: Path) -> int:
     out = out.resolve()
     (out / "logs").mkdir(exist_ok=True)
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    context = {
+        "scope": "toolchain preflight only; not a comparator layout",
+        "commit": os.environ.get("GITHUB_SHA"),
+        "run_url": f"https://github.com/{repository}/actions/runs/{run_id}"
+        if repository and run_id else None,
+        "geometry_units": "micrometres; Magic extract style ngspice",
+        "drc_style": "sky130A drc(full), Euclidean on",
+        "pex_settings": {"threshold_milliohm": 0, "minresist_milliohm": 0,
+                         "mindelay_ps": 0, "cthresh_ff": 0},
+    }
+    (out / "run-context.json").write_text(json.dumps(context, indent=2) + "\n")
     specs = json.loads((HERE / "devices.json").read_text())
     results = []
 
