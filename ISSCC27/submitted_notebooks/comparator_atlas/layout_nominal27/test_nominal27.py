@@ -137,6 +137,32 @@ class ContractTests(unittest.TestCase):
 
 
 class RoutingTests(unittest.TestCase):
+    def test_routed_gate_area_includes_actual_via1_metal1_residue(self):
+        mag = {
+            "label_positions": {"G": [30, 10, 30, 10]},
+            "rectangles": {
+                "metal1": [[0, 0, 60, 20], [0, 80, 60, 100]],
+                "via1": [[0, 20, 60, 80]],
+                "viali": [[20, 5, 40, 25]],
+            },
+        }
+        self.assertAlmostEqual(layout.gate_m1_area_um2(mag, "G"), 0.15)
+        self.assertEqual(len(mag["rectangles"]["metal1"]), 2)
+
+    def test_other_metals_and_disconnected_contact_area_do_not_count(self):
+        for extra in ("via1", "via2", "metal2"):
+            mag = {
+                "label_positions": {"G": [30, 10, 30, 10]},
+                "rectangles": {
+                    "metal1": [[0, 0, 60, 20]],
+                    extra: [[60, 20, 1000, 1000]] if extra == "via1"
+                    else [[0, 0, 1000, 1000]],
+                },
+            }
+            with self.subTest(layer=extra):
+                self.assertAlmostEqual(layout.gate_m1_area_um2(mag, "G"), 0.03)
+                self.assertLess(layout.gate_m1_area_um2(mag, "G"), 0.10)
+
     def test_reflection_transforms_actual_rectangles(self):
         self.assertEqual(layout.transform_rect([10, 20, 30, 40],
                          {"origin_um": [4.8, 0], "reflect_x": -1}),

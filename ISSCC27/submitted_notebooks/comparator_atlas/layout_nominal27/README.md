@@ -28,6 +28,12 @@ The connected short-channel M1 gate landing repair is retained. Actual
 geometric area and paired routing differences must be reported; neither
 common-centroid matching nor foundry signoff is claimed.
 
+The routed gate-area audit measures the connected polygon union including
+the pinned technology's genuine M1 residues: `metal1`, `viali`, and `via1`.
+Magic replaces overlapping M1 tiles with contact tiles; omitting `via1`
+understates the physical landing. M2/M3 geometry, disconnected islands, and
+bounding-box gaps do not count toward the unchanged 0.10 square-micrometre minimum.
+
 Schematic, connectivity-only, capacitance-only and actual distributed-RC
 netlists use identical external 5 fF loads and published measurements.
 Actual simulator device dimensions must confirm geometry scaling exactly

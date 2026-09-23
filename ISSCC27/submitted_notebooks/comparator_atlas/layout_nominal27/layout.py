@@ -24,6 +24,19 @@ from preflight import lvs_outcome, metal1_area_at_pin_um2
 GRID_UM = 0.005
 
 
+def gate_m1_area_um2(mag: dict, pin: str) -> float:
+    # The pinned technology gives via1 metal1/metal2 residues. The frozen
+    # primitive helper already includes viali, but routed cells also need via1.
+    rectangles = mag["rectangles"]
+    with_residue = {
+        **mag, "rectangles": {
+            **rectangles,
+            "metal1": rectangles.get("metal1", []) + rectangles.get("via1", []),
+        },
+    }
+    return metal1_area_at_pin_um2(with_residue, pin, GRID_UM)
+
+
 def run_logged(command: list[str], path: Path, out: Path, env: dict,
                input_text: str | None = None) -> str:
     with path.open("w", encoding="utf-8") as handle:
@@ -100,7 +113,7 @@ def assemble(out: Path) -> dict:
                 "PCell is not supported flat native rectangle geometry")
         parsed = inspect_mag(path)
         require(set(parsed["labels"]) == {"D", "G", "S", "B"}, "Incomplete real PCell terminals")
-        area = metal1_area_at_pin_um2(parsed, "G", GRID_UM)
+        area = gate_m1_area_um2(parsed, "G")
         require(area >= PROTOCOL["layout"]["minimum_connected_gate_m1_area_um2"],
                 f"Insufficient connected gate M1 area: {name}: {area}")
         placed = placement[name]
@@ -231,9 +244,11 @@ def geometry(out: Path, placement: dict) -> dict:
     for name, placed in placement.items():
         label = f"{name}.gate_measurement"
         mag["label_positions"][label] = placed["pins_grid"]["G"]
-        areas[name] = metal1_area_at_pin_um2(mag, label, GRID_UM)
-        require(areas[name] >= 0.10, f"Gate landing lost actual connected area: {name}")
+        areas[name] = gate_m1_area_um2(mag, label)
+        require(areas[name] >= PROTOCOL["layout"]["minimum_connected_gate_m1_area_um2"],
+                f"Gate landing lost actual connected area: {name}: {areas[name]}")
     return {"gds": gds, "physical_bbox": gds_bounds(out / "atlas.gds"),
+            "metal1_residue_layers": ["metal1", "viali", "via1"],
             "gate_m1_connected_areas_um2": areas, "mag_sha256": sha256(out / "atlas.mag"),
             "gds_sha256": sha256(out / "atlas.gds")}
 
