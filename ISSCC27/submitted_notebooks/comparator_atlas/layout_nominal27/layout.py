@@ -140,7 +140,9 @@ def assemble(out: Path) -> dict:
 
 def make_routes(out: Path, placement: dict) -> dict:
     rules = PROTOCOL["layout"]["routing"]
-    buses = {net: rules["bus_base_y_um"] + i*rules["bus_pitch_um"] for i, net in enumerate(NETS)}
+    buses = rules["bus_y_um"]
+    require(set(buses) == set(NETS), "Incomplete declared physical bus plan")
+    balanced = rules["balanced_outputs"]
     lines, endpoints, routes = [], defaultdict(list), []
     occupied_lanes = {}
 
@@ -179,7 +181,9 @@ def make_routes(out: Path, placement: dict) -> dict:
             box(lane-0.13, via_y-0.13, lane+0.13, via_y+0.13)
             lines.append("sky130::via1_draw")
             half = rules["metal2_width_um"]/2
-            paint("metal2", lane-half, via_y-half, lane+half, buses[net]+half)
+            top = balanced["metal2_top_y_um"] if net in balanced["nets"] else buses[net]
+            require(top >= buses[net], "Output balancing would disconnect its bus")
+            paint("metal2", lane-half, via_y-half, lane+half, top+half)
             box(lane-0.14, buses[net]-0.14, lane+0.14, buses[net]+0.14)
             lines.append("sky130::via2_draw")
             endpoints[net].append(lane)
@@ -187,12 +191,23 @@ def make_routes(out: Path, placement: dict) -> dict:
                            "contact_um": [x, y], "via1_um": [lane, via_y],
                            "via2_um": [lane, buses[net]],
                            "metal1_centerline_um": abs(lane-x)+abs(via_y-y),
-                           "metal2_centerline_um": buses[net]-via_y})
+                           "metal2_centerline_um": top-via_y,
+                           "metal2_series_path_um": buses[net]-via_y,
+                           "metal2_attached_stub_um": top-buses[net],
+                           "metal2_top_y_um": top})
     require(set(endpoints) == set(NETS), "Unrouted circuit net")
     bus_report = {}
     for net in NETS:
         y = buses[net]
         left, right = min(endpoints[net])-0.4, max(endpoints[net])+0.4
+        if net in balanced["nets"]:
+            span = balanced["bus_half_span_um"]
+            require(left >= -span and right <= span, "Output bus extension misses an endpoint")
+            left, right = -span, span
+        for other, previous in bus_report.items():
+            if y == previous["y_um"]:
+                gap = max(left-previous["right_um"], previous["left_um"]-right)
+                require(gap >= 0.30, f"Same-track nets touch or violate spacing: {net}/{other}")
         half = rules["metal3_width_um"]/2
         paint("metal3", left, y-half, right, y+half)
         center = round((left+right)/2/GRID_UM)*GRID_UM
@@ -202,18 +217,43 @@ def make_routes(out: Path, placement: dict) -> dict:
             lines.append(f"port make {PORTS.index(net)+1}")
         bus_report[net] = {"left_um": left, "right_um": right, "y_um": y,
                            "metal3_centerline_um": right-left, "label_um": [center, y]}
+    shields = rules["ground_shields"]
+    require(shields["net"] == "vss" and shields["via3_box_um"] >= 0.32,
+            "Shield contact differs from the real grounded via3 contract")
+    shield_rows = shields["y_um"]
+    for y in shield_rows:
+        half = rules["metal3_width_um"]/2
+        paint("metal3", shields["left_um"], y-half, shields["right_um"], y+half)
+    for x in shields["metal4_spine_x_um"]:
+        require(bus_report["vss"]["left_um"] < x < bus_report["vss"]["right_um"]
+                and shields["left_um"] < x < shields["right_um"],
+                "Ground shield spine is not over the connected VSS metal")
+        half = shields["metal4_width_um"]/2
+        paint("metal4", x-half, buses["vss"]-half, x+half, max(shield_rows)+half)
+        for y in [buses["vss"], *shield_rows]:
+            half = shields["via3_box_um"]/2
+            box(x-half, y-half, x+half, y+half)
+            lines.append("sky130::via3_draw")
     path = out / "route-request.tcl"
     path.write_text("\n".join([*lines, ""]))
     pairs = []
     for left, right in PROTOCOL["layout"]["mirror_pairs"]:
         totals = {}
+        series = {}
         for name in (left, right):
             totals[name] = sum(r["metal1_centerline_um"] + r["metal2_centerline_um"]
                                for r in routes if r["device"] == name)
+            series[name] = sum(r["metal1_centerline_um"] + r["metal2_series_path_um"]
+                               for r in routes if r["device"] == name)
         pairs.append({"left": left, "right": right, "escape_lengths_um": totals,
-                      "right_minus_left_um": totals[right]-totals[left]})
-    report = {"method": rules["description"], "terminal_routes": routes,
+                      "right_minus_left_um": totals[right]-totals[left],
+                      "series_escape_lengths_um": series,
+                      "series_right_minus_left_um": series[right]-series[left]})
+    report = {"revision": PROTOCOL["layout"]["revision"]["name"],
+              "method": rules["description"], "terminal_routes": routes,
               "buses": bus_report, "paired_escape_asymmetry": pairs,
+              "ground_shields": shields,
+              "output_balancing": balanced,
               "lengths_are_geometric_centerlines_not_extracted_effective_R": True}
     write_json(out / "routing.json", report)
     return report
@@ -238,7 +278,8 @@ def geometry(out: Path, placement: dict) -> dict:
     mag = inspect_mag(out / "atlas.mag")
     gds = inspect_gds(out / "atlas.gds")
     require(set(mag["labels"]) == set(NETS), "Top labels differ from actual routed net contract")
-    for layer in ("65/20", "66/20", "68/20", "69/20", "70/20", "125/44", "64/20"):
+    for layer in ("65/20", "66/20", "68/20", "69/20", "70/20", "71/20", "70/44",
+                  "125/44", "64/20"):
         require(gds["geometry_by_layer"].get(layer, 0) > 0, f"Missing nonempty GDS layer {layer}")
     areas = {}
     for name, placed in placement.items():

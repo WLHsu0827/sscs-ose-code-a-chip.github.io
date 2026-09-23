@@ -1,11 +1,15 @@
 """Small offline controls; these are not substitutes for real tool execution."""
 
 from pathlib import Path
+import hashlib
+import json
 import struct
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
+import analyze
 import contract
 import layout
 import simulate
@@ -29,6 +33,15 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(len(audit["ordered_ports"]), 15)
         self.assertEqual(audit["published_blob_sha256"], audit["worktree_bytes_sha256"])
         self.assertAlmostEqual(audit["source_junction_parameters"]["Xinp"]["ad"], 0.87)
+
+    def test_physical_revision_preserves_every_non_layout_policy_field(self):
+        policy = {key: contract.PROTOCOL[key] for key in (
+            "source", "budget", "tools", "structural_gates", "extraction", "simulation", "numerics")}
+        digest = hashlib.sha256(json.dumps(
+            policy, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        self.assertEqual(digest, "386bc16f5c55c467d0c7d72ec93d553907f8a2f290aa054b2cd50e0cfcf05454")
+        self.assertEqual(digest,
+                         contract.PROTOCOL["layout"]["revision"]["fixed_non_layout_policy_sha256"])
 
     def test_source_bytes_are_not_silently_canonicalized(self):
         source = contract.ENTRY / "results" / "study" / "selected_circuit.spice"
@@ -137,6 +150,17 @@ class ContractTests(unittest.TestCase):
 
 
 class RoutingTests(unittest.TestCase):
+    def placed(self):
+        placed = layout.placements()
+        for value in placed.values():
+            origin, reflection = value["origin_um"][0], value["reflect_x"]
+            value["pins_um"] = {
+                pin: [origin+reflection*x, y]
+                for pin, x, y in (("D", -0.26, 0), ("G", 0, 2),
+                                  ("S", 0.26, 0), ("B", -1.5, -2))
+            }
+        return placed
+
     def test_routed_gate_area_includes_actual_via1_metal1_residue(self):
         mag = {
             "label_positions": {"G": [30, 10, 30, 10]},
@@ -169,21 +193,94 @@ class RoutingTests(unittest.TestCase):
                          [930, 20, 950, 40])
 
     def test_all_devices_have_unique_lanes_and_real_net_routes(self):
-        placed = layout.placements()
-        for value in placed.values():
-            origin, reflection = value["origin_um"][0], value["reflect_x"]
-            value["pins_um"] = {
-                pin: [origin+reflection*x, y]
-                for pin, x, y in (("D", -0.26, 0), ("G", 0, 2),
-                                  ("S", 0.26, 0), ("B", -1.5, -2))
-            }
         with tempfile.TemporaryDirectory() as directory:
-            report = layout.make_routes(Path(directory), placed)
+            report = layout.make_routes(Path(directory), self.placed())
+            request = (Path(directory) / "route-request.tcl").read_text()
         routes = report["terminal_routes"]
         self.assertEqual(len(routes), 108)
         self.assertEqual(len({round(r["via1_um"][0], 6) for r in routes}), 108)
         self.assertEqual(set(report["buses"]), set(contract.NETS))
         self.assertTrue(all(r["metal2_centerline_um"] > 0 for r in routes))
+        self.assertEqual(request.count("port make "), 15)
+        self.assertEqual(request.count("label "), 26)
+        self.assertEqual(request.count("sky130::via3_draw"), 8)
+        self.assertEqual(request.count("paint metal4"), 2)
+        for row in report["paired_escape_asymmetry"]:
+            self.assertAlmostEqual(row["right_minus_left_um"], 0)
+        self.assertTrue(any(abs(row["series_right_minus_left_um"]) > 1
+                            for row in report["paired_escape_asymmetry"]))
+        for left, right in (("xp", "xn"), ("vinp", "vinn"),
+                            *[(f"sp{i}", f"sn{i}") for i in range(4)],
+                            *[(f"tp{i}", f"tn{i}") for i in range(4)]):
+            a, b = report["buses"][left], report["buses"][right]
+            self.assertEqual(a["y_um"], b["y_um"])
+            self.assertAlmostEqual(a["left_um"], -b["right_um"])
+            self.assertAlmostEqual(a["right_um"], -b["left_um"])
+        self.assertEqual(report["buses"]["qp"]["metal3_centerline_um"],
+                         report["buses"]["qn"]["metal3_centerline_um"])
+        self.assertTrue(all(r["metal2_attached_stub_um"] == 0 for r in routes if r["net"] != "qp"))
+        self.assertTrue(all(abs(r["metal2_attached_stub_um"]-1.6) < 1e-9
+                            for r in routes if r["net"] == "qp"))
+
+    def test_same_layer_output_short_and_undersized_shield_contact_are_rejected(self):
+        rules = contract.PROTOCOL["layout"]["routing"]
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(rules["bus_y_um"], {"qn": rules["bus_y_um"]["qp"]}):
+                with self.assertRaisesRegex(AssertionError, "Same-track nets"):
+                    layout.make_routes(Path(directory), self.placed())
+            with patch.dict(rules["ground_shields"], {"via3_box_um": 0.30}):
+                with self.assertRaisesRegex(AssertionError, "grounded via3"):
+                    layout.make_routes(Path(directory), self.placed())
+
+
+class AnalysisTests(unittest.TestCase):
+    def test_paths_report_real_elements_not_equivalent_parallel_resistance(self):
+        net = {"resistors": [
+            {"name": "R1", "nodes": ["xp", "xp.n0"], "value": 5},
+            {"name": "R2", "nodes": ["xp", "xp.n0"], "value": 10},
+            {"name": "R3", "nodes": ["xp.n0", "xp.n1"], "value": 3},
+        ]}
+        graph, anchors = analyze.dc_network(net)
+        path = analyze.shortest_resistor_path(graph, "xp", "xp.n1")
+        self.assertEqual(path["sum_ohm"], 8)
+        self.assertEqual(path["resistor_names"], ["R1", "R3"])
+        self.assertTrue(path["not_effective_parallel_network_resistance"])
+        self.assertEqual(anchors["xp.n1"], "xp")
+        with self.assertRaisesRegex(AssertionError, "No real resistor path"):
+            analyze.shortest_resistor_path(graph, "xp", "xn")
+        net["resistors"].append({"name": "Rshort", "nodes": ["xp.n0", "xn"], "value": 1})
+        with self.assertRaisesRegex(AssertionError, "Shorted intended nets"):
+            analyze.dc_network(net)
+
+    def test_capacitance_accounting_retains_distributed_same_net_elements(self):
+        anchors = {**{net: net for net in contract.NETS}, "xp.n0": "xp", "xp.n1": "xp"}
+        net = {"capacitors": [
+            {"nodes": ["xp.n0", "vss"], "value": 1e-15},
+            {"nodes": ["xp.n0", "xp.n1"], "value": 0.2e-15},
+            {"nodes": ["xp.n1", "xn"], "value": 2e-15},
+        ]}
+        report = analyze.capacitance_by_net(net, anchors)
+        self.assertAlmostEqual(report["xp"]["external_incident_sum_ff"], 3)
+        self.assertAlmostEqual(report["xp"]["ground_vss_ff"], 1)
+        self.assertAlmostEqual(report["xp"]["same_net_distributed_capacitance_ff"], 0.2)
+        self.assertAlmostEqual(report["xn"]["by_other_net_ff"]["xp"], 2)
+        self.assertEqual(len(net["capacitors"]), 3)
+
+    def test_native_junction_difference_cannot_hide_behind_device_signature(self):
+        native = contract.independent_reference().replace(" m=1", " m=1 ad=0.87 as=0.87 pd=6.58 ps=6.58")
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            for mode in ("lvs", "c", "rc"):
+                value = native.replace("ad=0.87", "ad=0.88", 1) if mode == "c" else native
+                (out / f"atlas.{mode}.spice").write_text(value)
+            with self.assertRaisesRegex(AssertionError, "changes native MOS cards"):
+                analyze.analyze(out)
+
+    def test_actual_material_union_does_not_count_overlap_twice(self):
+        rectangles = [[0, 0, 2, 2], [1, 1, 3, 3], [0, 0, 2, 2], [5, 0, 6, 1]]
+        self.assertEqual(analyze.rectangle_union_area(rectangles), 8)
+        self.assertEqual(analyze.rectangle_union_area([]), 0)
+        self.assertEqual(len(rectangles), 4)
 
 
 class NumericalTests(unittest.TestCase):

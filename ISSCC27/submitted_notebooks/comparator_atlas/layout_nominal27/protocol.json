@@ -45,6 +45,18 @@
     "no_full_pdk_or_historical_corpus": true
   },
   "layout": {
+    "revision": {
+      "name": "balanced-shielded-r1",
+      "authorized_comparator_attempt": 3,
+      "baseline_attempt": 2,
+      "baseline_run_id": 35824072501,
+      "baseline_commit": "426c88726b0e869e0e6dd18c3ee17513024c3b40",
+      "baseline_protocol_sha256": "56b99b4c6d0f7d3ff66b7fb429536ec7c9472cbbbb620e80e79fa1398c0aa3a4",
+      "baseline_routing_sha256": "b44bf9b682a261dbe24b5927d0e6cc25084ad6fdaf34eb00fd23445bc97d6afd",
+      "fixed_non_layout_policy_sha256": "386bc16f5c55c467d0c7d72ec93d553907f8a2f290aa054b2cd50e0cfcf05454",
+      "decision": "After retaining the baseline's physical passes and TT functional failures, spend one of the two remaining authorized jobs on actual balanced/shielded routing. Preserve all PCells, placement, device properties, stimulus, measurements, numerical gates, and code zero.",
+      "no_calibration_or_electrical_retuning": true
+    },
     "method": "Generate each real open_pdks PCell, transform its exact native rectangles into one flat Magic cell, then route with native Magic metal and open_pdks via generators.",
     "pcell": {"nf": 1, "m": 1, "guard": 1, "doports": 1, "topc": 1, "botc": 0, "reject_dimension_clamping": true},
     "gate_landing_um": [-0.15, -0.11, 0.15, 0.29],
@@ -60,10 +72,33 @@
       "metal1_escape_width_um": 0.36,
       "metal2_width_um": 0.36,
       "metal3_width_um": 0.40,
-      "bus_base_y_um": 8.0,
-      "bus_pitch_um": 0.8,
       "bus_order": ["vss", "vdd", "clk", "tail", "xp", "xn", "qp", "qn", "vinp", "vinn", "sp0", "sn0", "sp1", "sn1", "sp2", "sn2", "sp3", "sn3", "tp0", "tn0", "tp1", "tn1", "tp2", "tn2", "tp3", "tn3"],
-      "description": "M1 pin escapes to distinct M2 vertical lanes; distinct M3 horizontal buses. Real LI-to-M1 body contacts, via1 and via2. Opposite halves use reflected PCell geometry. Adjacent paired bus tracks are not claimed perfectly symmetric.",
+      "bus_y_um": {
+        "vss": 6.0, "vdd": 6.8, "clk": 7.6, "tail": 8.4,
+        "xp": 9.2, "xn": 9.2, "qp": 10.8, "qn": 12.4,
+        "vinp": 14.0, "vinn": 14.0,
+        "sp0": 14.8, "sn0": 14.8, "sp1": 15.6, "sn1": 15.6,
+        "sp2": 16.4, "sn2": 16.4, "sp3": 17.2, "sn3": 17.2,
+        "tp0": 18.0, "tn0": 18.0, "tp1": 18.8, "tn1": 18.8,
+        "tp2": 19.6, "tn2": 19.6, "tp3": 20.4, "tn3": 20.4
+      },
+      "balanced_outputs": {
+        "nets": ["qp", "qn"],
+        "bus_half_span_um": 25.4,
+        "metal2_top_y_um": 12.4,
+        "limitation": "Attached qp M2 stubs match mirrored metal extent, not series resistance. Report series paths and stubs separately; output M3 tracks remain at different heights."
+      },
+      "ground_shields": {
+        "net": "vss",
+        "left_um": -26.4,
+        "right_um": 26.4,
+        "y_um": [10.0, 11.6, 13.2],
+        "metal4_spine_x_um": [-26.0, 26.0],
+        "metal4_width_um": 0.40,
+        "via3_box_um": 0.34,
+        "connection": "Two real M4 spines join all three M3 shields to the existing VSS M3 bus through eight actual open_pdks via3 cells."
+      },
+      "description": "Unchanged mirrored PCells and M1 escapes. Disjoint paired M3 buses share identical heights. Full-span output buses have equal length, mirrored M2 extent, and three physically grounded M3 shields connected by symmetric M4 spines. Output series-path differences and the common tail's off-center drain escape remain explicitly measurable; no perfect-symmetry claim.",
       "report_per_net_and_pair_route_lengths": true
     },
     "report_actual_geometric_bbox_and_area": true,

@@ -41,11 +41,43 @@ once. All failures and finest-step contrary evidence remain visible. An
 unambiguous RC pilot failure ends expansion with a root-cause report, not
 geometry or stimulus retuning to make a result green.
 
+## Authorized physical routing revision
+
+Attempts 1 and 2 used identical physical polygons. Attempt 1's gate-area
+reporter missed the real M1 residue of `via1`; attempt 2 passed all 14
+structural checks with that reader corrected, but its code-zero TT C-only
+and RC simulations failed for positive inputs. The original layout,
+protocol, raw traces, and contrary outcomes remain retained. In that baseline,
+qn has 1.28575 fF more listed coupling to VSS, VDD and the ideal input sources
+than qp, while the device dimensions, junction geometry, body connections,
+and actual simulator scaling agree.
+
+The subsequent explicit decision authorizes only the two remaining
+comparator jobs for separately frozen physical revisions, not electrical
+retuning or relaxed qualification. `balanced-shielded-r1` preserves all
+27 generated devices and their placements. Disjoint mirrored buses share
+the same M3 height. The two output buses have equal full spans, real attached
+M2 balancing stubs, and three M3 ground shields joined to VSS by two M4
+spines and eight genuine `via3` contacts. These are layout polygons, not
+inserted ideal capacitors. The stubs match metal extent, not series
+resistance; the two output tracks and common tail escape retain explicitly
+reported residual asymmetry. No post-layout trim calibration is enabled.
+
+`analyze.py` checks full native LVS/C MOS-card equality including junction
+parameters, all three exported device/port/bulk contracts, retained FLOATING
+annotations, actual C matrices, and real resistor paths. Its path sums are
+not parallel-network equivalent resistances. It measures saved-MAG metal
+union areas with genuine contact residues and the actual GDS bounding box.
+Fresh four-mode simulation reports the corresponding core-energy cost.
+The original TT, pilot, 45-PVT, and monotone numerical gates remain identical;
+a clear failure still ends expansion **within each frozen revision**.
+
 ## Reproduction and evidence
 
 `run.sh` uses a fresh private work directory and reuses only the frozen preflight
 toolchain builder, not the exhausted preflight test job. It runs `layout.py`
-before fetching the three exact model flavors with `setup_models.py`. Simulation
+and the native parasitic analysis before fetching the three exact model flavors
+with `setup_models.py`. Simulation
 dependencies live in a job-private virtual environment. No system installation
 is performed on the shared Windows host.
 

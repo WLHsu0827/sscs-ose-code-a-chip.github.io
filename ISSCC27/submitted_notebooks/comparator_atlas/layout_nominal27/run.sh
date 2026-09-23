@@ -52,6 +52,8 @@ export PATH="$WORK/install/bin:$PATH"
 export PDK_ROOT="$WORK/src/open_pdks/sky130"
 stage=structural
 python3 "$HERE/layout.py" "$OUT"
+stage=native-parasitic-analysis
+python3 "$HERE/analyze.py" "$OUT"
 stage=private-models
 python3 "$HERE/setup_models.py" "$WORK/models" "$OUT/model-evidence"
 stage=private-simulation-environment
