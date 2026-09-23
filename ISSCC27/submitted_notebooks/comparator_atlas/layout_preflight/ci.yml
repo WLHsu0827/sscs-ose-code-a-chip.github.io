@@ -1,0 +1,42 @@
+name: Experimental SKY130 layout preflight
+
+on:
+  push:
+    branches: ["verify/comparator-atlas-layout-preflight"]
+    paths:
+      - ".github/workflows/comparator-atlas-layout-preflight.yml"
+      - "ISSCC27/submitted_notebooks/comparator_atlas/layout_preflight/**"
+
+permissions:
+  contents: read
+
+jobs:
+  layout-preflight:
+    if: github.repository == 'WLHsu0827/sscs-ose-code-a-chip.github.io'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PREFLIGHT: ISSCC27/submitted_notebooks/comparator_atlas/layout_preflight
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          sparse-checkout: |
+            ISSCC27/submitted_notebooks/comparator_atlas/layout_preflight
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install only the declared build dependencies on the disposable runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends $(cat "$PREFLIGHT/apt-packages.txt")
+      - name: Fail-closed evidence parser controls
+        run: python3 -m unittest discover -s "$PREFLIGHT" -p test_preflight.py -v
+      - name: Pinned tools, real PCells, DRC, strict LVS, and routed RC
+        run: timeout --signal=TERM --kill-after=30s 24m bash "$PREFLIGHT/run.sh"
+      - name: Preserve actual evidence even when a capability fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sky130-layout-preflight
+          path: ISSCC27/submitted_notebooks/comparator_atlas/layout_preflight/out
+          if-no-files-found: warn
+          retention-days: 14
