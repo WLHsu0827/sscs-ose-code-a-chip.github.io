@@ -1,0 +1,33 @@
+Comparator Atlas third-party notices
+
+This project's MIT license covers its original code, circuit deck, and prose.
+It does not replace the licenses of downloaded tools, dependencies, or PDK data.
+
+SkyWater SKY130 primitive library
+  Copyright 2020 The SkyWater PDK Authors.
+  Apache License 2.0.
+  Source: https://github.com/google/skywater-pdk-libs-sky130_fd_pr
+  Revision: f62031a1be9aefe902d6d54cddd6f59b57627436
+  The original license and copyright headers remain in the downloaded checkout.
+  Model files are not modified or relicensed by this project.
+
+ngspice
+  Berkeley SPICE and ngspice contributors; its distribution contains the
+  applicable Berkeley/BSD-style and component-specific notices.
+  Source and documentation: https://ngspice.sourceforge.io/
+  The official Windows distribution is downloaded separately and retains its
+  accompanying notices. It is not part of the proposed source-only submission.
+
+uv
+  Copyright Astral Software Inc. and contributors; MIT / Apache-2.0.
+  Source: https://github.com/astral-sh/uv
+  Used only to provision a local Python runtime.
+
+Python and Python packages
+  Each package retains its own license and metadata in the isolated environment.
+  The dependency versions are recorded in requirements-windows.lock.
+
+Related research
+  The conventional StrongARM topology is credited to existing literature.
+  The cited SKY130 comparator RL project was consulted as related work; its
+  implementation was not copied. No paper figures or text are reproduced.

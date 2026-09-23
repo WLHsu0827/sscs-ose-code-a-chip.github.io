@@ -1,0 +1,487 @@
+"""Offline, interactive presentation of checked optimization and validation evidence."""
+
+import base64
+from dataclasses import replace
+import html
+import json
+from pathlib import Path
+import re
+
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+import numpy as np
+import pandas as pd
+
+from .designs import get_design
+from .plots import style
+from .spice import CORNERS, EVALUATION_START_S, Point, Simulator, sha256, write_json
+from .stress import (
+    STRESS_NAMES, load_stress, load_verified_validation as load_validation,
+    verified_comparison as comparison,
+)
+from .study import (
+    CACHE, POLICIES, STUDY, checked_manifest, limitations,
+)
+
+POLICY_LABELS = {
+    "code_zero": "Code zero", "nominal_frozen": "Nominal code, frozen",
+    "local_boundary": "Local 3.5 ns calibration", "deadline_aware": "Local 1 ns calibration",
+}
+POLICY_COLORS = {
+    "code_zero": "#64748b", "nominal_frozen": "#e7a339",
+    "local_boundary": "#099c90", "deadline_aware": "#6676dc",
+}
+STRESS_LABELS = {
+    "ideal_reference": "Ideal input reference", "opposite_input_history": "Opposite input history",
+    "source_1k_20f": "1 kohm source / 20 fF", "source_5k_20f": "5 kohm source / 20 fF",
+    "settling_10k_200f": "10 kohm / 200 fF + history",
+    "common_mode_0p45": "Common mode = 0.45 VDD",
+    "common_mode_0p60": "Common mode = 0.60 VDD", "output_load_20f": "20 fF output load",
+}
+
+
+def search_figure(selection: dict):
+    style()
+    records = selection["candidates"]
+    names = [record["design"]["name"] for record in records]
+    chosen = selection["selected_design"]
+    baseline = next(record for record in records if record["design"]["name"] == "baseline")
+    colors = ["#099c90" if name == chosen else "#8798b1" for name in names]
+    y = np.arange(len(records))
+    figure, axes = plt.subplots(1, 3, figsize=(13.5, 5.5), sharey=True)
+    axes[0].barh(y, [100 * record["worst_case_correct_fraction"] for record in records], color=colors)
+    axes[0].set_yticks(y, names)
+    axes[0].invert_yaxis()
+    axes[0].set(xlabel="Worst training-case correct points (%)", xlim=(0, 105))
+    energy = [
+        record["mean_core_energy_fj"] / baseline["mean_core_energy_fj"]
+        if record["mean_core_energy_fj"] is not None else np.nan for record in records
+    ]
+    area = [
+        record["design"]["gate_area_proxy_um2"] / baseline["design"]["gate_area_proxy_um2"]
+        for record in records
+    ]
+    axes[1].barh(y, energy, color=colors)
+    axes[1].axvline(2, linestyle="--", color="#e7a339", label="Declared 2x budget")
+    axes[1].set_xlabel("Mean core energy / baseline")
+    axes[1].legend(fontsize=8)
+    axes[2].barh(y, area, color=colors)
+    axes[2].axvline(4, linestyle="--", color="#e7a339", label="Declared 4x budget")
+    axes[2].set_xlabel("Gate-area proxy / baseline (not layout)")
+    axes[2].legend(fontsize=8)
+    for ax in axes:
+        ax.grid(axis="x", alpha=0.15)
+    figure.suptitle("Every declared candidate is visible; teal was selected before full PVT validation")
+    figure.tight_layout()
+    return figure
+
+
+def coverage_figure(frame: pd.DataFrame, selected_name: str, deadline_ns: float = 1.0,
+                    minimum_input_mv: float = 1.0, policy: str = "local_boundary"):
+    style()
+    cmap = LinearSegmentedColormap.from_list("coverage", ["#df5363", "#e9b44c", "#17a897"])
+    names = ("baseline", selected_name)
+    figure, axes = plt.subplots(2, 5, figsize=(14, 6.2), sharex=True, sharey=True)
+    selected = frame[
+        (frame.deadline_ns == deadline_ns) & (frame.input_mv.abs() >= minimum_input_mv)
+        & (frame.input_mv != 0) & (frame.policy == policy) & (frame.pair_skew == 0.04)
+    ].copy()
+    selected["correct"] = selected.outcome == "correct"
+    for row, name in enumerate(names):
+        for column, corner in enumerate(CORNERS):
+            data = selected[(selected.design_name == name) & (selected.corner == corner)]
+            values = data.groupby(["temperature_c", "vdd_v"]).correct.mean().unstack().reindex(
+                index=[-40, 27, 125], columns=[1.62, 1.8, 1.95],
+            )
+            if values.isna().any().any():
+                raise ValueError("The regular 45-condition PVT figure is missing a cell")
+            ax = axes[row, column]
+            image = ax.imshow(values.values, vmin=0, vmax=1, cmap=cmap, aspect="auto")
+            for y in range(3):
+                for x in range(3):
+                    ax.text(x, y, f"{100 * values.values[y, x]:.0f}%", ha="center", va="center", fontsize=10)
+            ax.set_xticks([0, 1, 2], ["1.62", "1.80", "1.95"])
+            ax.set_yticks([0, 1, 2], ["-40", "27", "125"])
+            ax.set_title(corner.upper())
+            if column == 0:
+                ax.set_ylabel(("Original circuit" if row == 0 else "Selected circuit") + "\nTemperature (C)")
+            if row == 1:
+                ax.set_xlabel("VDD (V)")
+    figure.subplots_adjust(left=0.09, right=0.90, bottom=0.11, top=0.85, hspace=0.35, wspace=0.18)
+    color_axis = figure.add_axes([0.92, 0.23, 0.012, 0.52])
+    figure.colorbar(image, cax=color_axis, label="Passing grid fraction (not yield)")
+    figure.suptitle(
+        f"Same policy, same inputs, same deadline | {POLICY_LABELS[policy]}\n"
+        f"|input| >= {minimum_input_mv:g} mV at {deadline_ns:g} ns; +4% branch-width stress",
+    )
+    return figure
+
+
+def policy_figure(frame: pd.DataFrame, selected_name: str):
+    style()
+    figure, axes = plt.subplots(1, 2, figsize=(12.5, 4.8), sharey=True)
+    for ax, name, title in zip(axes, ("baseline", selected_name), ("Original circuit", "Selected circuit")):
+        data = frame[(frame.design_name == name) & (frame.input_mv.abs() >= 1)].copy()
+        data["correct"] = data.outcome == "correct"
+        for policy in POLICIES:
+            grouped = data[data.policy == policy].groupby("deadline_ns").correct.mean()
+            ax.plot(grouped.index, 100 * grouped.values, "o-", color=POLICY_COLORS[policy],
+                    label=POLICY_LABELS[policy], markersize=4)
+        ax.set(title=title, xlabel="Decision deadline (ns)", ylim=(-2, 102))
+        ax.grid(alpha=0.2)
+    axes[0].set_ylabel("Passing grid points (%)")
+    axes[1].legend(fontsize=8, loc="lower right")
+    figure.suptitle("49 declared conditions, |input| >= 1 mV; unavailable calibration remains in the denominator")
+    figure.tight_layout()
+    return figure
+
+
+def guardband_figure(frame: pd.DataFrame, selected_name: str):
+    style()
+    figure, axes = plt.subplots(1, 2, figsize=(12.5, 4.8), sharey=True)
+    minimums = (0.25, 0.5, 1, 3, 10, 30)
+    for ax, name, title in zip(axes, ("baseline", selected_name), ("Original circuit", "Selected circuit")):
+        for policy in ("nominal_frozen", "local_boundary", "deadline_aware"):
+            values = []
+            for minimum in minimums:
+                data = frame[(frame.design_name == name) & (frame.policy == policy)
+                             & (frame.deadline_ns == 1) & (frame.input_mv.abs() >= minimum)]
+                values.append(100 * (data.outcome == "correct").mean())
+            ax.plot(range(len(minimums)), values, "o-", color=POLICY_COLORS[policy], label=POLICY_LABELS[policy])
+        ax.set_xticks(range(len(minimums)), [str(value) for value in minimums])
+        ax.set(title=title, xlabel="Minimum absolute input in scored band (mV)", ylim=(-2, 102))
+        ax.grid(alpha=0.2)
+    axes[0].set_ylabel("Passing grid points at 1 ns (%)")
+    axes[1].legend(fontsize=8, loc="lower right")
+    figure.suptitle("Resolution is not free: the tiny-input failures stay visible")
+    figure.tight_layout()
+    return figure
+
+
+def operating_figure(operating: pd.DataFrame, selected_name: str):
+    style()
+    data = operating[operating.deadline_ns == 1].copy()
+    data["correct"] = data.outcome == "correct"
+    figure, axes = plt.subplots(1, 2, figsize=(13, 5.8), sharey=True)
+    y = np.arange(len(STRESS_NAMES))
+    for name, shift, color, label in (
+        ("baseline", -0.18, "#8798b1", "Original circuit"),
+        (selected_name, 0.18, "#099c90", "Selected circuit"),
+    ):
+        selected = data[data.design_name == name]
+        coverage = selected.groupby("stress").correct.mean().reindex(STRESS_NAMES)
+        disturbance = selected.groupby("stress").max_differential_input_error_mv.max().reindex(STRESS_NAMES)
+        axes[0].barh(y + shift, 100 * coverage.values, height=0.34, color=color, label=label)
+        axes[1].barh(y + shift, disturbance.values, height=0.34, color=color)
+    axes[0].set_yticks(y, [STRESS_LABELS[name] for name in STRESS_NAMES])
+    axes[0].invert_yaxis()
+    axes[0].set_xlabel("Passing points at 1 ns (%)")
+    axes[0].set_xlim(0, 105)
+    axes[0].legend(fontsize=8)
+    axes[1].set_xlabel("Maximum differential input-pin error (mV)")
+    for ax in axes:
+        ax.grid(axis="x", alpha=0.2)
+    figure.suptitle("No retraining after stress: driver loading, settling, common mode and output load")
+    figure.tight_layout()
+    return figure
+
+
+def cold_waveform_figure(reports: list[dict], selected_name: str):
+    style()
+    simulator = Simulator(CACHE)
+    figure, axes = plt.subplots(2, 1, figsize=(11, 6), sharex=True)
+    for ax, design_name in zip(axes, ("baseline", selected_name)):
+        report = next(report for report in reports if report["design_name"] == design_name
+                      and report["point"]["corner"] == "ss" and report["point"]["vdd_v"] == 1.62
+                      and report["point"]["temperature_c"] == -40 and report["point"]["pair_skew"] == 0.04)
+        code = report["codes"]["local_boundary"]
+        if code is None:
+            raise ValueError("The documented cold-corner waveform has no available local code")
+        point = replace(Point(**report["point"]), differential_v=-0.001, trim_code=code)
+        trace = simulator.run(point)
+        x = (trace.values[:, 0] - EVALUATION_START_S) * 1e9
+        mask = (x >= -0.15) & (x <= 3.5)
+        for column, label, color in ((1, "Clock", "#98a8bf"), (2, "Q+", "#099c90"), (3, "Q-", "#df5363")):
+            ax.plot(x[mask], trace.values[mask, column], color=color, label=label)
+        ax.axvline(1, linestyle="--", color="#e7a339", label="1 ns deadline")
+        ax.set(title=f"{design_name}; local trim {code:+d}", ylabel="Voltage (V)")
+        ax.legend(ncol=4, fontsize=8, loc="upper right")
+    axes[1].set_xlabel("Time from evaluation clock midpoint (ns)")
+    figure.suptitle("The known weak corner, not a cherry-picked nominal trace: SS / 1.62 V / -40 C / -1 mV")
+    figure.tight_layout()
+    return figure
+
+
+def explorer_cube(frame: pd.DataFrame, reports: list[dict], selected_name: str) -> dict:
+    designs = list(dict.fromkeys(frame.design_name))
+    case_names = list(dict.fromkeys(frame.case_id))
+    deadlines = sorted(frame.deadline_ns.unique().tolist())
+    inputs = sorted(frame.input_mv.unique().tolist())
+    designs_index = {value: index for index, value in enumerate(designs)}
+    case_index = {value: index for index, value in enumerate(case_names)}
+    deadline_index = {value: index for index, value in enumerate(deadlines)}
+    input_index = {value: index for index, value in enumerate(inputs)}
+    policy_index = {value: index for index, value in enumerate(POLICIES)}
+    status = {"wrong": 0, "unresolved": 1, "correct": 2, "calibration_unavailable": 3, "reference": 4}
+    rows = []
+    for row in frame.itertuples():
+        rows.append([
+            designs_index[row.design_name], case_index[row.case_id], policy_index[row.policy],
+            deadline_index[row.deadline_ns], input_index[row.input_mv],
+            4 if row.input_mv == 0 else status[row.outcome],
+            round(row.decision_time_ns, 4) if pd.notna(row.decision_time_ns) else None,
+            round(row.core_energy_fj, 3) if pd.notna(row.core_energy_fj) else None,
+            int(row.trim_code) if pd.notna(row.trim_code) else None,
+        ])
+    return {
+        "designs": designs, "cases": case_names, "policies": list(POLICIES),
+        "policyLabels": [POLICY_LABELS[name] for name in POLICIES],
+        "deadlines": deadlines, "inputs": inputs, "rows": rows, "selectedDesign": selected_name,
+        "trainingCases": sorted({
+            case_index[report["case_id"]] for report in reports if report["used_for_design_selection"]
+        }),
+    }
+
+
+def paired_energy(frame: pd.DataFrame, selected_name: str) -> dict:
+    eligible = frame[(frame.policy == "local_boundary") & (frame.deadline_ns == 1)
+                     & (frame.input_mv.abs() >= 1) & frame.policy_available]
+    baseline = eligible[eligible.design_name == "baseline"][["case_id", "input_mv", "core_energy_fj"]]
+    selected = eligible[eligible.design_name == selected_name][["case_id", "input_mv", "core_energy_fj"]]
+    matched = baseline.merge(selected, on=["case_id", "input_mv"], suffixes=("_baseline", "_selected"), validate="one_to_one")
+    if matched.empty:
+        raise ValueError("There are no matched, actually simulated energy comparison points")
+    original = float(matched.core_energy_fj_baseline.mean())
+    improved = float(matched.core_energy_fj_selected.mean())
+    return {
+        "matched_points": len(matched), "baseline_fj": original, "selected_fj": improved,
+        "relative_change_percent": 100 * (improved / original - 1),
+        "gate_area_ratio": get_design(selected_name).gate_area_um2 / get_design("baseline").gate_area_um2,
+    }
+
+
+def render_study() -> Path:
+    frame, reports, manifest = load_validation()
+    numerical, operating, stress = load_stress()
+    optimization = checked_manifest("optimization_manifest.json")
+    selection = json.loads((STUDY / "selection.json").read_text())
+    name = selection["selected_design"]
+    author = json.loads((STUDY.parents[1] / "entry_metadata.json").read_text())["authors"][0]
+    professional = None
+    professional_directory = STUDY / "professional"
+    if (professional_directory / "manifest.json").is_file():
+        professional_status = json.loads((professional_directory / "manifest.json").read_text())
+        if professional_status["status"] == "complete":
+            import entry_tools
+            professional = entry_tools.load_evidence()
+    score = comparison()
+    reserved = comparison(reserved_only=True)
+    energy = paired_energy(frame, name)
+    baseline_fraction = float(score.loc[("baseline", "local_boundary"), "pass_fraction"])
+    selected_fraction = float(score.loc[(name, "local_boundary"), "pass_fraction"])
+    figures = STUDY / "figures"
+    figures.mkdir(exist_ok=True)
+    factories = {
+        "search.png": lambda: search_figure(selection),
+        "pvt.png": lambda: coverage_figure(frame, name),
+        "policies.png": lambda: policy_figure(frame, name),
+        "guardbands.png": lambda: guardband_figure(frame, name),
+        "operating.png": lambda: operating_figure(operating, name),
+        "cold_waveforms.png": lambda: cold_waveform_figure(reports, name),
+    }
+    if professional is not None:
+        factories["efficient_control.png"] = lambda: entry_tools.tradeoff_figure(professional)
+    pictures = {}
+    for filename, factory in factories.items():
+        figure = factory()
+        figure.savefig(figures / filename, dpi=150, bbox_inches="tight")
+        plt.close(figure)
+        data = base64.b64encode((figures / filename).read_bytes()).decode("ascii")
+        pictures[filename] = f'<img alt="{filename}" src="data:image/png;base64,{data}">'
+    cube = explorer_cube(frame, reports, name)
+    write_json(STUDY / "explorer_data.json", cube)
+    payload = json.dumps(cube, separators=(",", ":"), allow_nan=False).replace("<", "\\u003c")
+    javascript_path = Path(__file__).parent / "assets" / "explorer.mjs"
+    javascript = javascript_path.read_text(encoding="utf-8")
+    numerical_status = "PASS" if stress["numerical_passed"] else "REQUIRES REVIEW"
+    warnings = sum(len(receipt["warnings"]) for receipt in (optimization, manifest, stress))
+    total_runs = len(set(optimization["run_ids"]) | set(manifest["run_ids"]) | set(stress["run_ids"]))
+    professional_section = ""
+    if professional is not None:
+        total_runs = len(
+            set(optimization["run_ids"]) | set(manifest["run_ids"]) | set(stress["run_ids"])
+            | set(professional["control"]["run_ids"])
+        )
+        target_band = entry_tools.summary(professional, minimum_mv=1)
+        wide_band = entry_tools.summary(professional, minimum_mv=3)
+        professional_section = f"""
+<section><h2>Energy-efficient control: compare engineering choices, not only a weak baseline</h2>
+<p>This is an explicitly <strong>post-selection ablation</strong> of an existing lower-energy
+LVT candidate. It uses the same 49 conditions and input grid with separate numerical refinement;
+it does not replace the frozen original selection or create a newly blinded benchmark.</p>
+{pictures["efficient_control.png"]}
+<h3>Local calibration, 1 ns, sampled |input| &ge; 1 mV</h3>
+<div class="table-scroll">{target_band.to_html(float_format=lambda value: f"{value:.4g}", border=0)}</div>
+<h3>Same policy and deadline, sampled |input| &ge; 3 mV</h3>
+<div class="table-scroll">{wide_band.to_html(float_format=lambda value: f"{value:.4g}", border=0)}</div>
+<p class="muted">All-sampled-points passing is not a guarantee between sample points.
+Worst-condition coverage and the count of fully passing conditions are reported alongside
+the mean. Neither circuit is asserted best for every energy, input-resolution or interface requirement.</p>
+<h3>Calibration workload, not implemented on-chip calibration cost</h3>
+<div class="table-scroll">{entry_tools.calibration_workload(professional).to_html(border=0)}</div>
+<p class="muted">A distinct probe represents an offline three-cycle simulation.
+Reference/input generation, drivers, control logic and storage are not included in core energy.
+The additional control has not inherited the original/selected circuits' input-interface stress results.</p>
+</section>"""
+    version = re.search(r"\bngspice-(\S+)", manifest["provenance"]["ngspice_version"])
+    if version is None:
+        raise ValueError("Missing simulator version in the checked evidence")
+    caveats = "".join(f"<li>{html.escape(value)}</li>" for value in limitations())
+    html_body = f"""<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comparator Atlas | When calibration is not enough</title>
+<style>
+:root{{color-scheme:light;--ink:#14213d;--teal:#099c90;--muted:#65758b}}
+*{{box-sizing:border-box}}body{{margin:0;background:#eef3f8;color:var(--ink);font:15px/1.65 system-ui,sans-serif}}
+header{{background:linear-gradient(125deg,#0f1d35,#1c3852);padding:54px max(5vw,24px);color:#fff}}
+header small{{color:#66ddc7;letter-spacing:.15em;font-weight:750}}h1{{font-size:clamp(38px,5vw,68px);line-height:1.06;margin:18px 0}}
+header p{{max-width:900px;color:#c9d7e8}}.tag{{display:inline-block;margin:6px 8px 4px 0;
+border:1px solid #63809b;border-radius:20px;padding:3px 12px;font-size:12px}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:28px;max-width:1250px}}
+.card{{background:#ffffff0c;border:1px solid #ffffff22;border-radius:12px;padding:18px}}
+.card strong{{display:block;font-size:30px;color:#6ae2cc}}main{{max-width:1400px;margin:auto;padding:24px}}
+section{{background:#fff;border:1px solid #dce5ef;border-radius:15px;margin:24px 0;padding:28px}}
+h2{{margin:0 0 12px;font-size:25px}}h3{{margin-bottom:6px}}img{{width:100%;height:auto}}
+.muted{{color:var(--muted);font-size:13px}}.notice{{border-left:5px solid #e7a339}}
+.table-scroll{{overflow:auto}}table{{border-collapse:collapse;width:100%;font-size:13px}}
+th,td{{padding:9px;text-align:right;border-bottom:1px solid #e2e8f0;white-space:nowrap}}th:first-child{{text-align:left}}
+code{{overflow-wrap:anywhere;font-size:12px}}a{{color:#087f76}}.controls{{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}}
+label{{display:flex;align-items:center;gap:6px;font-size:13px}}select{{padding:8px;border:1px solid #cdd8e5;border-radius:7px;background:white;color:var(--ink)}}
+#explorer-grid{{max-height:640px;overflow:auto;border:1px solid #dce5ef;border-radius:8px}}
+.decision-grid th,.decision-grid td{{padding:2px;white-space:nowrap;font-size:10px;border:1px solid #fff}}
+.decision-grid thead{{position:sticky;top:0;background:#eff4f9;z-index:2}}
+.decision-grid th:first-child{{position:sticky;left:0;background:#f7f9fc;min-width:235px;z-index:1;padding-left:8px}}
+.grid-cell{{display:block;width:100%;min-width:27px;height:21px;border:0;cursor:pointer;color:#fff;font-weight:700}}
+.grid-cell:focus{{outline:2px solid #14213d;outline-offset:-2px}}.outside-score{{opacity:.32}}
+#explorer-stats{{font-weight:700;color:#076e66}}#explorer-detail{{min-height:65px;padding:14px;background:#f0f5f9;border-radius:8px;font-size:13px}}
+.legend{{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin:12px 0}}.swatch{{width:12px;height:12px;display:inline-block;margin-right:5px}}
+.metric{{font-weight:700;color:#087f76}}.split{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}}
+@media(max-width:700px){{main{{padding:10px}}section{{padding:18px}}.controls label{{width:100%}}}}
+@media print{{header{{padding:20px}}section{{break-inside:avoid}}.controls,#explorer-grid,#explorer-detail{{display:none}}}}
+</style>
+<header><small>REPRODUCIBLE ANALOG DESIGN / IEEE SSCS CODE-A-CHIP CANDIDATE</small>
+<h1>Comparator Atlas</h1><p style="font-size:23px;margin:0 0 8px">When calibration is not enough.</p>
+<p><strong>{html.escape(author["name"])}</strong> &mdash; {html.escape(author["affiliation"])}</p>
+<p>Same supply, common mode, load and decision deadline. A declared nine-candidate search,
+full PVT comparison and input-driver stress study separate genuine progress from a flattering nominal plot.</p>
+<span class="tag">SKY130 / ngspice {html.escape(version.group(1))}</span>
+<span class="tag">Original baseline preserved</span><span class="tag">Research candidate / not submitted</span>
+<div class="cards">
+<div class="card"><strong>{100 * baseline_fraction:.1f}% &rarr; {100 * selected_fraction:.1f}%</strong>
+target-band grid coverage<br><small>same local calibration; 1 ns; |input| &ge; 1 mV</small></div>
+<div class="card"><strong>49 &times; {len(manifest["designs"])}</strong>declared operating cases<br><small>45-point PVT grid + four stress controls per design</small></div>
+<div class="card"><strong>{total_runs:,}</strong>distinct physical SPICE runs<br><small>search, validation and robustness evidence</small></div>
+<div class="card"><strong>{energy["relative_change_percent"]:+.1f}%</strong>mean core-energy change<br><small>{energy["matched_points"]} matched points; not total chip energy</small></div>
+</div></header><main>
+<section class="notice"><h2>The improvement has a price and a scope</h2>
+<div class="split"><div><p>Selected circuit: <code>{html.escape(name)}</code>.</p>
+<p>The transistor gate-area proxy is <span class="metric">{energy["gate_area_ratio"]:.2f}x</span> the original.
+Matched mean core-rail energy is <strong>{energy["baseline_fj"]:.2f} &rarr; {energy["selected_fj"]:.2f} fJ/cycle</strong>.
+This is not a claim of lower area, lower system power, silicon yield or a new comparator topology.</p></div>
+<div><p>Numerical refinement: <strong>{numerical_status}</strong> across {len(numerical):,} deadline checks.
+Simulator warning-bearing runs across phase receipts: {warnings}.</p>
+<p>The first 10-to-5 ps pass exposed <strong>{stress["initial_numerical_failures"]} failing checks</strong>.
+{stress["refined_physical_points"]} physical points were refined further; all matching policy rows now use
+the accepted fine-step waveform, including corrections that made the circuit look worse.
+The original results and failed checks remain published.</p>
+<p>The baseline is our first prototype, not the best published comparator. Established StrongARM,
+auxiliary-pair calibration and low-threshold-device ideas are credited below.</p></div></div></section>
+<section><h2>01 / Selection before full validation</h2>{pictures["search.png"]}
+<p class="muted">Selection used TT/1.8 V/27 C, SS/1.62 V/-40 C and FF/1.95 V/125 C,
+six declared input values, and 2x energy / 4x gate-area-proxy budgets. The initial prototype informed the family.
+The recorded objective and candidate list were frozen before this campaign. No global optimum is asserted.</p></section>
+<section><h2>02 / The full PVT comparison</h2>{pictures["pvt.png"]}
+<p class="muted">The figure contains the regular 45-condition PVT grid at +4% branch-width stress.
+All plots and tables are deterministic test coverage, not error probability or manufacturing yield.
+The four additional nominal stress controls remain in the full table and explorer.</p>
+<div class="table-scroll">{score.to_html(float_format=lambda value: f"{value:.4g}", border=0)}</div>
+<h3>Reserved conditions only</h3>
+<p class="muted">The following table removes the three selection conditions. It is an internal reserved evaluation,
+not a blinded external benchmark. Unavailable calibration remains a failed coverage point; its energy is not invented.</p>
+<div class="table-scroll">{reserved.to_html(float_format=lambda value: f"{value:.4g}", border=0)}</div></section>
+{professional_section}
+<section><h2>03 / Inspect every decision yourself</h2>
+<p>These controls filter stored SPICE observations; they do not launch simulations.
+The input guardband changes the scoring band, not the underlying outcomes. Dimmed cells are outside that band.</p>
+<div class="controls">
+<label>Circuit <select id="explorer-design"></select></label>
+<label>Policy <select id="explorer-policy"></select></label>
+<label>Deadline <select id="explorer-deadline"></select></label>
+<label>Scored inputs <select id="explorer-guardband"></select></label>
+<label><input type="checkbox" id="explorer-reserved">Exclude selection conditions</label></div>
+<div class="legend">
+<span><i class="swatch" style="background:#17a897"></i>Correct</span>
+<span><i class="swatch" style="background:#df5363"></i>Wrong</span>
+<span><i class="swatch" style="background:#e9b44c"></i>Unresolved</span>
+<span><i class="swatch" style="background:#8876c8"></i>Calibration unavailable</span>
+<span><i class="swatch" style="background:#d5dee9"></i>Zero input, unscored</span></div>
+<p id="explorer-stats" aria-live="polite"></p><div id="explorer-grid"></div>
+<p id="explorer-detail" role="status"></p></section>
+<section><h2>04 / Timing and resolution are coupled</h2>{pictures["policies.png"]}{pictures["guardbands.png"]}
+<p class="muted">The hardware comparison uses the same local 3.5 ns calibration policy.
+The 1 ns policy is a separate ablation: it minimizes the finite-deadline decision interval rather than
+only its long-deadline offset. A failed calibration is explicitly unavailable, not silently replaced by code zero.</p></section>
+<section><h2>05 / A real weak-corner waveform</h2>{pictures["cold_waveforms.png"]}
+<p class="muted">This condition was known to be weak in the first prototype and was included in selection.
+It illustrates mechanism; the reserved/full PVT tables, not this one waveform, support generalization within the declared grid.</p></section>
+<section><h2>06 / Stress the interface, not just the transistor model</h2>{pictures["operating.png"]}
+<p class="muted">Five nominal/extreme PVT conditions, four inputs, and eight explicitly defined stresses per design.
+Codes are frozen before perturbing the interface. The history step changes the external input at 18 to 18.05 ns;
+evaluation starts at 22.025 ns. Pin error includes deterministic settling and kickback, not random noise.</p>
+<p class="muted">{html.escape(stress["numerical_scope"])} Refinement limits are identical outcomes,
+at most 1% core-energy difference and at most 20 ps resolved-latency difference. These checks are not production signoff.</p></section>
+<section><h2>07 / Reproduce, audit, and reuse</h2>
+<p>Public entry: <code>Comparator_Atlas.ipynb</code>, with Python 3.10 review mode and Colab bootstrap.
+The original complete study notebook remains available locally as
+<code>Comparator_Atlas_Optimized.ipynb</code>. Optional Windows bootstrap:
+<code>node scripts\\setup.mjs</code>. Then run the CLI stages
+<code>optimize</code>, <code>study</code>, <code>stress</code> and <code>report</code>
+with the project Python and <code>-m comparator_atlas</code>.</p>
+<p>Every physical run is keyed by its reproduction deck, initialization, model contents and executable.
+Batch execution keeps its actual executed deck and log, not only a schematic screenshot.
+Source and result hashes bind the analysis to the recorded protocol.</p>
+<p>Numerical correction protocol: {html.escape(stress["refinement_policy"])}</p>
+<p>SKY130 primitive revision: <code>{html.escape(manifest["provenance"]["pdk_revision"])}</code>.</p>
+<h3>Limitations and disclosure</h3><ul>{caveats}</ul>
+<p>Author attribution was supplied by the entrant. AI assistance is disclosed.
+This report does not assert an award, IEEE endorsement, new topology or silicon measurement.
+Publication and upstream PR status are recorded separately.</p>
+<h3>Established ideas and related work</h3>
+<ul>
+<li>B. Razavi, <a href="https://doi.org/10.1109/MSSC.2015.2418155">The StrongARM Latch</a>, 2015.</li>
+<li>S. Li, Z. Xu and T. Iizuka, <a href="https://doi.org/10.1007/s10470-022-01992-6">
+Analysis of strong-arm comparator with auxiliary pair for offset calibration</a>, 2022.</li>
+<li><a href="https://github.com/ChrisZonghaoLi/sky130_comparator_rl">Open comparator optimization research</a>
+and <a href="https://github.com/edonD/sky130-comparator">an existing SKY130/LVT comparator example</a>.
+Their code, figures, performance claims and statistical assumptions are not reused as this study's evidence.</li>
+<li><a href="https://github.com/google/skywater-pdk-libs-sky130_fd_pr">Official SKY130 primitive models</a>
+and <a href="https://github.com/sscs-ose/sscs-ose-code-a-chip.github.io">current competition rules</a>.</li>
+</ul></section></main>
+<script id="atlas-cube" type="application/json">{payload}</script>
+<script type="module">{javascript}</script></html>"""
+    path = STUDY / "report.html"
+    path.write_text(html_body, encoding="utf-8")
+    write_json(STUDY / "presentation_manifest.json", {
+        "status": "complete",
+        "validation_manifest_sha256": sha256(STUDY / "validation_manifest.json"),
+        "stress_manifest_sha256": sha256(STUDY / "stress_manifest.json"),
+        "report_source_sha256": sha256(Path(__file__)),
+        "explorer_source_sha256": sha256(javascript_path),
+        "professional_control_manifest_sha256": sha256(professional_directory / "manifest.json")
+        if professional is not None else None,
+        "artifact_sha256": {
+            "report.html": sha256(path), "explorer_data.json": sha256(STUDY / "explorer_data.json"),
+            **{str(Path("figures") / filename): sha256(figures / filename) for filename in factories},
+        },
+    })
+    return path

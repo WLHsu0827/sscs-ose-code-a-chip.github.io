@@ -1,0 +1,43 @@
+{
+  "status": "passed",
+  "report_sha256": "8a918c1cb9f000bcba5c21c8643cb4638086161fabb77a9013258319b0711e46",
+  "browser": "Edg/153.0.4234.48",
+  "fixture": false,
+  "views": [
+    {
+      "label": "initial selected-circuit view",
+      "correct": 372,
+      "total": 392,
+      "visibleRows": 49
+    },
+    {
+      "label": "baseline strict deadline",
+      "correct": 69,
+      "total": 588,
+      "visibleRows": 49
+    },
+    {
+      "label": "reserved conditions only",
+      "correct": 62,
+      "total": 552,
+      "visibleRows": 46
+    },
+    {
+      "label": "unavailable policies retained",
+      "correct": 59,
+      "total": 588,
+      "visibleRows": 49
+    }
+  ],
+  "imageCount": 7,
+  "cellInspection": "lvt_balanced_4b | TT | 1.62 V | -40 C | skew +4% | input -30 mV | deadline 1 ns | Correct | trim -2 | decision time 0.2476 ns | core energy 165.201 fJ.",
+  "cases": 49,
+  "decisions": 30576,
+  "javascript_errors": 0,
+  "external_network_requests": 0,
+  "screenshots": [
+    "report-desktop.png",
+    "report-explorer.png",
+    "report-mobile.png"
+  ]
+}

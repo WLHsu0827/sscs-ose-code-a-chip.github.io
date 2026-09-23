@@ -1,0 +1,11 @@
+{
+  "status": "entry_supporting_material_not_peer_reviewed",
+  "poster_source_sha256": "cc8832b585bf360f50f5c7bf35d093dd0542d89c4fc1026e66dd058cd91597f4",
+  "validation_manifest_sha256": "84466bdfc4b9051db25f7ddf87d9cd28c3c66efc0b1b5775b8e198127b4a55ef",
+  "stress_manifest_sha256": "cab8ac38a1e268b471b4e53399199842be0eca2e75ac2b69da8effe8ce1022d6",
+  "artifact_sha256": {
+    "Comparator_Atlas_Poster.pdf": "c99cf5a298ca4869dc90bcd5e3299636107917f6155f7fab5ac8036d711981ad",
+    "poster_preview.png": "0d7b36fcfe0b0cb6bf8cbc798498b7a23241635f87ec2b681adec27027e582ef",
+    "abstract.txt": "6f93cfc0510b434f14ed1e8e73e7dc9d71895a81f2e8ce9f756a8d5c12c00eec"
+  }
+}
