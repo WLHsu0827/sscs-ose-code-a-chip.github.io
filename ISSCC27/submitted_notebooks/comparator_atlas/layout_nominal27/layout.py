@@ -113,6 +113,9 @@ def assemble(out: Path) -> dict:
                 "PCell is not supported flat native rectangle geometry")
         parsed = inspect_mag(path)
         require(set(parsed["labels"]) == {"D", "G", "S", "B"}, "Incomplete real PCell terminals")
+        require(not set(parsed["rectangles"]).intersection(
+            {"metal2", "via1", "via2", "metal3", "via3", "metal4"}),
+            "Over-device routing requires the verified M1-only native PCells")
         area = gate_m1_area_um2(parsed, "G")
         require(area >= PROTOCOL["layout"]["minimum_connected_gate_m1_area_um2"],
                 f"Insufficient connected gate M1 area: {name}: {area}")
@@ -164,7 +167,6 @@ def make_routes(out: Path, placement: dict) -> dict:
             require(round(lane, 6) not in occupied_lanes, "Two terminals share a vertical M2 lane")
             occupied_lanes[round(lane, 6)] = (device["name"], pin)
             via_y = y + 0.20 if pin == "G" else y
-            require(via_y < buses[net] - 1, "Routing bus collides with a device")
             if pin == "B":
                 paint("locali", x-0.15, y-0.15, x+0.15, y+0.15)
                 box(x-0.085, y-0.085, x+0.085, y+0.085)
@@ -182,8 +184,11 @@ def make_routes(out: Path, placement: dict) -> dict:
             lines.append("sky130::via1_draw")
             half = rules["metal2_width_um"]/2
             top = balanced["metal2_top_y_um"] if net in balanced["nets"] else buses[net]
-            require(top >= buses[net], "Output balancing would disconnect its bus")
-            paint("metal2", lane-half, via_y-half, lane+half, top+half)
+            if net in balanced["nets"]:
+                require(top >= max(buses[net], via_y), "Output balancing misses its terminal/bus")
+            low, high = min(via_y, buses[net], top), max(via_y, buses[net], top)
+            series = abs(buses[net]-via_y)
+            paint("metal2", lane-half, low-half, lane+half, high+half)
             box(lane-0.14, buses[net]-0.14, lane+0.14, buses[net]+0.14)
             lines.append("sky130::via2_draw")
             endpoints[net].append(lane)
@@ -191,10 +196,10 @@ def make_routes(out: Path, placement: dict) -> dict:
                            "contact_um": [x, y], "via1_um": [lane, via_y],
                            "via2_um": [lane, buses[net]],
                            "metal1_centerline_um": abs(lane-x)+abs(via_y-y),
-                           "metal2_centerline_um": top-via_y,
-                           "metal2_series_path_um": buses[net]-via_y,
-                           "metal2_attached_stub_um": top-buses[net],
-                           "metal2_top_y_um": top})
+                           "metal2_centerline_um": high-low,
+                           "metal2_series_path_um": series,
+                           "metal2_attached_stub_um": high-low-series,
+                           "metal2_bottom_y_um": low, "metal2_top_y_um": high})
     require(set(endpoints) == set(NETS), "Unrouted circuit net")
     bus_report = {}
     for net in NETS:

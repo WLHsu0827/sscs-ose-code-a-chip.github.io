@@ -208,7 +208,14 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(len(routes), 108)
         self.assertEqual(len({round(r["via1_um"][0], 6) for r in routes}), 108)
         self.assertEqual(set(report["buses"]), set(contract.NETS))
-        self.assertTrue(all(r["metal2_centerline_um"] > 0 for r in routes))
+        self.assertTrue(all(r["metal2_centerline_um"] >= 0 for r in routes))
+        self.assertGreater(sum(r["metal2_centerline_um"] for r in routes), 0)
+        tail_drain = next(r for r in routes if (r["device"], r["terminal"]) == ("Xtail", "D"))
+        self.assertEqual(tail_drain["metal2_centerline_um"], 0)
+        self.assertEqual(tail_drain["via1_um"], tail_drain["via2_um"])
+        clock = next(r for r in routes if (r["device"], r["terminal"]) == ("Xtail", "G"))
+        self.assertLess(clock["via2_um"][1], clock["via1_um"][1])
+        self.assertAlmostEqual(clock["metal2_series_path_um"], 3.0)
         self.assertEqual(request.count("port make "), 15)
         self.assertEqual(request.count("label "), 26)
         self.assertEqual(request.count("sky130::via3_draw"), 8)
@@ -239,6 +246,16 @@ class RoutingTests(unittest.TestCase):
             with patch.dict(rules["ground_shields"], {"via3_box_um": 0.30}):
                 with self.assertRaisesRegex(AssertionError, "grounded via3"):
                     layout.make_routes(Path(directory), self.placed())
+
+    def test_last_revision_geometry_does_not_change_device_or_balancing_contract(self):
+        rules = contract.PROTOCOL["layout"]["routing"]
+        self.assertEqual(contract.PROTOCOL["layout"]["revision"]["authorized_comparator_attempt"], 4)
+        self.assertEqual(rules["metal2_width_um"], 0.20)
+        self.assertEqual(rules["metal3_width_um"], 0.34)
+        self.assertGreater(rules["metal2_width_um"], 0.14)
+        self.assertGreater(rules["metal3_width_um"], 0.30)
+        self.assertEqual(rules["balanced_outputs"]["nets"], ["qp", "qn"])
+        self.assertEqual(rules["ground_shields"]["net"], "vss")
 
 
 class AnalysisTests(unittest.TestCase):

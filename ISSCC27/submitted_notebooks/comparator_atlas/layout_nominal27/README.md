@@ -72,6 +72,30 @@ Fresh four-mode simulation reports the corresponding core-energy cost.
 The original TT, pilot, 45-PVT, and monotone numerical gates remain identical;
 a clear failure still ends expansion **within each frozen revision**.
 
+Attempt 3 actually passed all 14 structural controls and the TT four-mode
+code-zero gate. Its RC -3/+3 mV delays are 0.842970/0.842783 ns and energies
+520.872/520.806 fJ, compared with the matched nominal schematic's approximately
+0.280439 ns and 244.052 fJ. Output quiet-rail capacitance imbalance fell from
+1.28575 to 0.01195 fF, and the actual bounding-box area fell from 4281.984 to
+3297.024 square micrometres. This is a real polarity/matching improvement,
+not full PVT qualification: the five-condition pilot has 14 unresolved SS
+rows out of 80 at 1 ns, so the 45-PVT sweep did not run. `balanced-r1-receipt.json`
+retains all primary results, exact artifact hashes, and the distinction between
+audited TT/SS results and the declared 10 ps FF pilot.
+
+The final authorized revision, `compact-shielded-r2`, retains that physical
+matching arrangement but lowers the same bus/shield pattern by 8.4 micrometres
+over the verified M1-only PCells. M2 lanes go either up or down to their actual
+M3 connections, rather than requiring all buses above the cells. M2 strips
+are 0.20 micrometres wide (deck minimum 0.14), and M3 strips are 0.34
+micrometres wide (minimum 0.30); the genuine via generators still supply their
+full enclosure pads. Shield spans, output matching, device dimensions,
+placement, code zero, and the entire non-layout policy remain fixed.
+Shorter/narrower routing is a geometric prediction of lower parasitic loading;
+only actual extraction and matched simulation can establish its benefit.
+This is comparator job 4 of 4; another failure is retained, not followed by
+an unauthorized fifth run.
+
 ## Reproduction and evidence
 
 `run.sh` uses a fresh private work directory and reuses only the frozen preflight
