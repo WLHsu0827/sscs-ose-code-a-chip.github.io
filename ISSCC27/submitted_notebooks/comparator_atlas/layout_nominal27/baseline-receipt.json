@@ -82,7 +82,8 @@
   },
   "baseline_diagnosis": {
     "report": "baseline-analysis.json",
-    "report_sha256": "c711c29f69dd46330269e3cf598ae19324c692271db2360ac6c680c100165e11",
+    "report_sha256": "05a4f173ac1877f5707688f8a9a8834c0d26de7da7550e1586ddf72e927fb2f4",
+    "report_serialization": "UTF-8 LF, matching the repository blob; native artifact hashes always cover their exact original bytes.",
     "raw_lvs_c_mos_cards_and_junction_parameters_identical": true,
     "all_passive_endpoints_dc_anchored": true,
     "all_nmos_bodies": "vss",

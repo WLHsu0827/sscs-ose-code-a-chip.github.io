@@ -43,6 +43,14 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(digest,
                          contract.PROTOCOL["layout"]["revision"]["fixed_non_layout_policy_sha256"])
 
+    def test_portable_json_evidence_and_frozen_baseline_hash(self):
+        path = self.root / "evidence.json"
+        contract.write_json(path, {"evidence": True})
+        self.assertNotIn(b"\r", path.read_bytes())
+        receipt = json.loads((contract.HERE / "baseline-receipt.json").read_text())
+        report = receipt["baseline_diagnosis"]
+        self.assertEqual(contract.sha256(contract.HERE / report["report"]), report["report_sha256"])
+
     def test_source_bytes_are_not_silently_canonicalized(self):
         source = contract.ENTRY / "results" / "study" / "selected_circuit.spice"
         changed = self.root / "changed.spice"
