@@ -121,4 +121,63 @@ commit `9b194bb4fc4d6328b2546f983a71b550df084257`, failed in checkout before
 dependencies or tools ran. The checkout action's auth cleanup reported
 `No url found for submodule path ... sky130-opamp in .gitmodules`.
 This is an infrastructure failure, **not** a DRC, LVS, or PEX result.
-Only one further initial verification run is authorized.
+Attempt 2: [run 35809175154](https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/actions/runs/35809175154),
+commit `0cd79b96016b4ebc39af26d7c1542bb667c8dce6`, completed in 48 seconds with
+**failure**. Both authorized attempts are now consumed. No third run was started,
+no controls were relaxed, and no comparator layout was attempted.
+
+Unlike attempt 1, attempt 2 actually built and executed Magic **8.3.684** and
+circuit Netgen **1.5.323**, generated the open_pdks **1.0.608** tools-only deck,
+and wrote real layouts, extracted devices, DRC results and RC networks.
+The recorded source/build/install directories totaled 91,812 KiB (about 89.7 MiB).
+
+| Capability | Actual evidence from attempt 2 | Outcome |
+|---|---|---|
+| Pinned tools / genuine PDK staging | Built tools, executed version/commit, generated deck and source hashes retained | Passed |
+| Ten four-terminal primitives | Nonempty MAG/GDS; one correct model/W/L transistor per cell; D/G/S/B labels and `.ext` ports present | Observed |
+| Six LVT dimension combinations | `drc(full)` logs and zero raw DRC errors for all six | Observed local DRC pass |
+| SVT NFET, PFET and two routed probes | Three error rectangles each for gate-contact metal1 minimum area, `met1.6` | Failed |
+| Deliberate spacing error | Two `met1.2` errors for a 0.07 um gap below the 0.14 um rule | Detected |
+| Positive LVS and four LVS mutations | Missing top-level `.subckt` wrapper; Netgen cannot find the named circuit | Blocked, not comparisons |
+| Separate C and RC extraction | Each C-only file: 6 C / 0 R; each RC file: 21 R / 11 C plus `.res.ext` | Partial, not accepted PEX |
+
+**First substantive blocker:** the short-channel primitives' isolated gate metal1
+landing is approximately 0.29 by 0.23 um (0.0667 um2), below `met1.6`'s
+0.083 um2 minimum. The PCell device dimensions themselves are extracted correctly;
+this is missing legal landing/routing area in the preflight structure. The
+three rectangles are regions for one rule, not three independent rule types.
+
+There are additional harness/integration blockers, all preserved in the failed
+evidence rather than relabeled as passes:
+
+- `[drc style]` prints the style but returns an empty Tcl value, so the report's
+  style field is blank. The captured Magic log explicitly names `drc(full)`.
+  The automated geometry/DRC assertions therefore failed even for the six
+  raw-zero-error LVT cells and the correctly detected spacing control.
+- `.mag` and `.ext` contain numbered ports, but the selected flat SPICE output
+  has no `.subckt` wrapper. Netgen launches and reads the files, then reports
+  `Cannot find cell n_input3`; the setup/classification and real comparisons
+  are not reached. Wrong-connection/bulk/width/flavor controls are **unproven**.
+- `extract style ngspice` is ambiguous at this version; the actual `.ext` style
+  is `ngspice()`. The obsolete `-y` accuracy option also produces a warning.
+- Both RC files contain real positive extracted elements, but the long drain
+  path is represented by only one resistor, not the multiple drain-path
+  segments required by the acceptance check. Some internal capacitances carry
+  Magic's `; **FLOATING` comment, which the strict parser also needs to handle
+  without discarding connectivity checks. No simulation or PEX signoff occurred.
+
+The short/long drain resistors are **51.6048 / 175.749 ohm**. Across each whole
+RC netlist, resistor values span 5.8005 to 3285.26 ohm; the latter values include
+body-network resistance, not just the deliberately routed metal. Total extracted
+RC capacitance is **5.95932 / 35.43025 fF**, with individual capacitors ranging
+from 0.03067 fF to 4.64862 / 34.05628 fF. These measurements establish that the
+outputs are not the parasitic-free LVS files, but do not satisfy the complete
+DRC/LVS/distributed-route acceptance.
+
+The automated receipt remains **12 PASS / 42 FAIL**, not a green preflight.
+Post-run read-only inspection verified all **141** recorded artifact hashes and
+the device/layer facts above without modifying the downloaded outputs.
+`verification_receipt.json` records the exact run, commit, artifact, deck hash,
+capability limitations and measured values. The downloaded evidence is also
+retained in the session artifact directory. Further execution requires a new
+decision; the experimental branch remains at the attempt-2 commit.
