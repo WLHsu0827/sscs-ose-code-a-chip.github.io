@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("preflight", Path(__file__).with_name("preflight.py"))
 preflight = importlib.util.module_from_spec(spec)
@@ -16,6 +17,20 @@ class EvidenceChecks(unittest.TestCase):
             path = Path(directory) / "test.spice"
             path.write_text(text)
             return preflight.read_spice(path)
+
+    def branched_rc(self):
+        net = self.parse(preflight.independent_reference(DEVICE))
+        net["devices"][0]["pins"][0] = "device_d"
+        net["resistors"] = [
+            {"name": "R1", "nodes": ["D", "junction"], "value": 10},
+            {"name": "R2", "nodes": ["junction", "upper"], "value": 20},
+            {"name": "R3", "nodes": ["junction", "lower"], "value": 30},
+            {"name": "R4", "nodes": ["upper", "device_d"], "value": 5},
+            {"name": "R5", "nodes": ["lower", "device_d"], "value": 7},
+        ]
+        net["capacitors"] = [{"name": "C1", "nodes": ["upper", "B"], "value": 1e-15,
+                              "annotation": "**FLOATING"}]
+        return net
 
     def test_independent_reference_and_units(self):
         net = self.parse(preflight.independent_reference(DEVICE))
@@ -35,6 +50,34 @@ class EvidenceChecks(unittest.TestCase):
         with self.assertRaises(AssertionError):
             preflight.check_device(net, DEVICE)
 
+    def test_top_contract_is_checked_before_netgen(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            wrong = dict(DEVICE, cell="wrong")
+            (out / "test.lvs.spice").write_text(preflight.independent_reference(wrong))
+            with patch.object(preflight, "run_logged") as run:
+                with self.assertRaisesRegex(AssertionError, "Wrong extracted top cell"):
+                    preflight.run_lvs(out, DEVICE)
+                run.assert_not_called()
+
+    def test_missing_or_malformed_wrapper_rejected(self):
+        source = preflight.independent_reference(DEVICE)
+        for text in (source.replace(".ends test", ""), source.replace(".ends test", ".ends other"),
+                     source.replace(".subckt test D G S B\n", "")):
+            with self.subTest(text=text), self.assertRaises(AssertionError):
+                self.parse(text)
+
+    def test_netgen_property_failure_is_not_a_missing_comparison(self):
+        result = preflight.lvs_outcome("PREFLIGHT_LVS_RESULT -3 -3", "width")
+        self.assertFalse(result["expected_match"])
+        for text, mutation in (("PREFLIGHT_LVS_RESULT -1 -1", "width"),
+                               ("PREFLIGHT_LVS_RESULT 0 0", "width"),
+                               ("PREFLIGHT_LVS_RESULT 1 1", "flavor"),
+                               ("PREFLIGHT_LVS_RESULT -3 -3", None)):
+            with self.subTest(text=text, mutation=mutation), self.assertRaises(AssertionError):
+                preflight.lvs_outcome(text, mutation)
+        self.assertTrue(preflight.lvs_outcome("PREFLIGHT_LVS_RESULT 1 1", None)["expected_match"])
+
     def test_scale_directive_rejected(self):
         with self.assertRaises(AssertionError):
             self.parse(".option scale=1e-6\n" + preflight.independent_reference(DEVICE))
@@ -46,17 +89,53 @@ class EvidenceChecks(unittest.TestCase):
             preflight.rc_metrics(net)
 
     def test_rc_must_reach_the_transistor(self):
-        net = self.parse(preflight.independent_reference(DEVICE))
-        net["devices"][0]["pins"][0] = "device_d"
-        net["resistors"] = [
-            {"name": "R1", "nodes": ["D", "internal"], "value": 10},
-            {"name": "R2", "nodes": ["internal", "isolated"], "value": 20},
-        ]
-        net["capacitors"] = [{"name": "C1", "nodes": ["internal", "B"], "value": 1e-15}]
+        net = self.branched_rc()
+        net["devices"][0]["pins"][0] = "unconnected_device"
         with self.assertRaises(AssertionError):
             preflight.rc_metrics(net)
-        net["resistors"][1]["nodes"][1] = "device_d"
-        self.assertEqual(preflight.rc_metrics(net)["drain_resistance_sum_ohm"], 30)
+        net["devices"][0]["pins"][0] = "device_d"
+        metrics = preflight.rc_metrics(net)
+        self.assertEqual(metrics["drain_resistance_sum_ohm"], 72)
+        self.assertEqual(metrics["drain_branch_nodes"], ["junction"])
+        self.assertEqual(metrics["floating_annotated_capacitors_checked"], ["C1"])
+
+    def test_floating_annotations_are_retained_and_connectivity_checked(self):
+        source = preflight.independent_reference(DEVICE).replace(
+            ".ends test", "C1 D B 1f ; **FLOATING\n.ends test")
+        parsed = self.parse(source)
+        self.assertEqual(parsed["capacitors"][0]["annotation"], "**FLOATING")
+        self.assertEqual(parsed["capacitors"][0]["nodes"], ["D", "B"])
+        self.assertEqual(parsed["capacitors"][0]["value"], 1e-15)
+        net = self.branched_rc()
+        net["capacitors"].append({"name": "C2", "nodes": ["unanchored", "B"],
+                                  "value": 1e-15, "annotation": "**FLOATING"})
+        with self.assertRaisesRegex(AssertionError, "Unanchored parasitic"):
+            preflight.rc_metrics(net)
+
+    def test_resistive_terminal_short_is_not_valid_pex(self):
+        net = self.branched_rc()
+        net["resistors"].append({"name": "Rbad", "nodes": ["D", "G"], "value": 10})
+        with self.assertRaisesRegex(AssertionError, "Unexpected resistive short"):
+            preflight.rc_metrics(net)
+
+    def test_point_to_point_chain_is_not_a_branched_probe(self):
+        net = self.branched_rc()
+        net["resistors"] = [
+            {"name": "R1", "nodes": ["D", "upper"], "value": 10},
+            {"name": "R2", "nodes": ["upper", "device_d"], "value": 20},
+        ]
+        with self.assertRaisesRegex(AssertionError, "No extracted branch junction"):
+            preflight.rc_metrics(net)
+
+    def test_gate_area_requires_connected_geometry_and_real_grid(self):
+        mag = {"label_positions": {"G": [0, 0, 0, 0]},
+               "rectangles": {"metal1": [[-29, -23, 29, 23], [100, 100, 300, 300]],
+                              "viali": [[-17, -17, 17, 17]]}}
+        self.assertAlmostEqual(preflight.metal1_area_at_pin_um2(mag, "G", 0.005), 0.0667)
+        mag["rectangles"]["metal1"].append([-30, -22, 30, 58])
+        self.assertAlmostEqual(preflight.metal1_area_at_pin_um2(mag, "G", 0.005), 0.12145)
+        with self.assertRaises(AssertionError):
+            preflight.metal1_area_at_pin_um2(mag, "G", 0)
 
     def test_empty_geometry_is_not_evidence(self):
         with tempfile.TemporaryDirectory() as directory:

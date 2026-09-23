@@ -42,14 +42,17 @@ def spice_number(token: str) -> float:
 def read_spice(path: Path) -> dict:
     logical = []
     for raw in path.read_text().splitlines():
-        line = raw.strip()
+        code, _, annotation = raw.partition(";")
+        line = code.strip()
         if line.startswith("+"):
             require(bool(logical), "SPICE continuation without an initial line")
-            logical[-1] += " " + line[1:]
+            previous, comment = logical[-1]
+            logical[-1] = (previous + " " + line[1:], comment + " " + annotation.strip())
         elif line and not line.startswith("*"):
-            logical.append(line)
+            logical.append((line, annotation.strip()))
     result = {"devices": [], "resistors": [], "capacitors": [], "ports": []}
-    for line in logical:
+    inside, ended = False, False
+    for line, annotation in logical:
         tokens = line.split()
         first = tokens[0].lower()
         require(not (first in (".scale", ".option", ".options") and
@@ -58,7 +61,13 @@ def read_spice(path: Path) -> dict:
             require(not result["ports"], "Expected one flat top-level subcircuit")
             result["ports"] = tokens[2:]
             result["cell"] = tokens[1]
+            inside = True
+        elif first == ".ends":
+            require(inside and (len(tokens) == 1 or tokens[1:] == [result["cell"]]),
+                    f"Incorrect subcircuit ending: {line}")
+            inside, ended = False, True
         elif first.startswith("x"):
+            require(inside, "Transistor outside the extracted .subckt")
             require(len(tokens) >= 8 and tokens[5] in MODELS,
                     f"Unexpected/non-four-terminal primitive: {line}")
             properties = dict(re.findall(r"(\w+)\s*=\s*([^\s]+)", " ".join(tokens[6:])))
@@ -69,13 +78,15 @@ def read_spice(path: Path) -> dict:
                 "m": float(properties.get("m", "1")),
             })
         elif first.startswith(("r", "c")):
+            require(inside, "Parasitic outside the extracted .subckt")
             require(len(tokens) == 4, f"Unexpected passive element: {line}")
             item = {"name": tokens[0], "nodes": tokens[1:3],
-                    "value": spice_number(tokens[3])}
+                    "value": spice_number(tokens[3]), "annotation": annotation}
             result["resistors" if first.startswith("r") else "capacitors"].append(item)
         elif not first.startswith("."):
             raise AssertionError(f"Unrecognized SPICE element: {line}")
     require(result["ports"], f"No subcircuit ports in {path}")
+    require(ended and not inside, f"Unterminated extracted subcircuit in {path}")
     return result
 
 
@@ -118,6 +129,7 @@ def inspect_gds(path: Path) -> dict:
 def inspect_mag(path: Path) -> dict:
     layers = collections.Counter()
     labels = set()
+    rectangles, positions = collections.defaultdict(list), {}
     current = None
     for line in path.read_text().splitlines():
         if line.startswith("<< "):
@@ -126,10 +138,47 @@ def inspect_mag(path: Path) -> dict:
             x1, y1, x2, y2 = map(int, line.split()[1:])
             require(x2 > x1 and y2 > y1, "Degenerate Magic rectangle")
             layers[current] += 1
+            rectangles[current].append([x1, y1, x2, y2])
         elif line.startswith(("rlabel ", "flabel ")):
-            labels.add(line.split()[-1])
+            fields = line.split()
+            labels.add(fields[-1])
+            positions[fields[-1]] = list(map(int, fields[2:6]))
     require(layers, "No painted Magic geometry")
-    return {"rectangles_by_layer": dict(layers), "labels": sorted(labels)}
+    return {"rectangles_by_layer": dict(layers), "labels": sorted(labels),
+            "rectangles": dict(rectangles), "label_positions": positions}
+
+
+def metal1_area_at_pin_um2(mag: dict, pin: str, grid_um: float) -> float:
+    """Measure the actual connected M1/contact component, not a bounding box."""
+    require(math.isfinite(grid_um) and grid_um > 0, "Invalid layout grid")
+    label = mag["label_positions"][pin]
+    x, y = (label[0] + label[2]) / 2, (label[1] + label[3]) / 2
+    boxes = mag["rectangles"].get("metal1", []) + mag["rectangles"].get("viali", [])
+    reached = {i for i, b in enumerate(boxes) if b[0] <= x <= b[2] and b[1] <= y <= b[3]}
+    require(reached, f"Pin {pin} has no actual metal1/contact landing")
+
+    def connected(a, b):
+        dx = min(a[2], b[2]) - max(a[0], b[0])
+        dy = min(a[3], b[3]) - max(a[1], b[1])
+        return dx >= 0 and dy >= 0 and (dx > 0 or dy > 0)
+
+    while True:
+        expanded = reached | {i for i, b in enumerate(boxes)
+                              if any(connected(b, boxes[j]) for j in reached)}
+        if expanded == reached:
+            break
+        reached = expanded
+    component = [boxes[i] for i in reached]
+    xs = sorted({x for b in component for x in (b[0], b[2])})
+    area = 0
+    for left, right in zip(xs, xs[1:]):
+        intervals = sorted((b[1], b[3]) for b in component if b[0] <= left and b[2] >= right)
+        length, end = 0, -math.inf
+        for low, high in intervals:
+            length += max(0, high - max(low, end))
+            end = max(end, high)
+        area += (right - left) * length
+    return area * grid_um * grid_um
 
 
 def independent_reference(spec: dict, mutation: str | None = None) -> str:
@@ -152,6 +201,7 @@ def independent_reference(spec: dict, mutation: str | None = None) -> str:
 
 
 def check_device(net: dict, spec: dict, connectivity: bool = True) -> dict:
+    require(net["cell"] == spec["cell"], f"Wrong extracted top cell: {net['cell']}")
     require(net["ports"] == ["D", "G", "S", "B"], f"Wrong port order: {net['ports']}")
     require(len(net["devices"]) == 1, f"Expected one real transistor: {net['devices']}")
     device = net["devices"][0]
@@ -170,22 +220,48 @@ def check_device(net: dict, spec: dict, connectivity: bool = True) -> dict:
     return device
 
 
+def terminal_components(net: dict) -> dict:
+    """Require each physical terminal and every parasitic node to be DC-anchored."""
+    components = {}
+    for port in net["ports"]:
+        reached = {port}
+        while True:
+            expanded = reached | {
+                node for resistor in net["resistors"]
+                if reached.intersection(resistor["nodes"]) for node in resistor["nodes"]
+            }
+            if expanded == reached:
+                break
+            reached = expanded
+        require(reached.intersection(net["ports"]) == {port},
+                f"Unexpected resistive short between external ports on {port}")
+        components[port] = reached
+    for device in net["devices"]:
+        d, g, s, b = device["pins"]
+        require(g in components["G"] and b in components["B"],
+                f"Unanchored gate/body terminal: {device['pins']}")
+        require((d in components["D"] and s in components["S"]) or
+                (s in components["D"] and d in components["S"]),
+                f"Unanchored source/drain terminal: {device['pins']}")
+    anchored = set().union(*components.values())
+    for item in net["resistors"] + net["capacitors"]:
+        require(set(item["nodes"]) <= anchored,
+                f"Unanchored parasitic, including any FLOATING annotation: {item}")
+    return components
+
+
 def rc_metrics(net: dict) -> dict:
     require(len(net["resistors"]) >= 2 and net["capacitors"],
             "Missing actual distributed R or extracted C")
     for item in net["resistors"] + net["capacitors"]:
         require(item["value"] > 0, f"Nonpositive parasitic: {item}")
-    reached = {"D"}
-    while True:
-        expanded = reached | {
-            node for resistor in net["resistors"]
-            if reached.intersection(resistor["nodes"]) for node in resistor["nodes"]
-        }
-        if expanded == reached:
-            break
-        reached = expanded
+    components = terminal_components(net)
+    reached = components["D"]
     drain_r = [r for r in net["resistors"] if set(r["nodes"]) <= reached]
     require(len(drain_r) >= 2, "External D does not reach a distributed resistance network")
+    degrees = collections.Counter(node for r in drain_r for node in r["nodes"])
+    branch_nodes = sorted(node for node, degree in degrees.items() if degree >= 3)
+    require(branch_nodes, "No extracted branch junction in the multi-contact drain network")
     transistor_pins = {pin for device in net["devices"] for pin in
                        (device["pins"][0], device["pins"][2])}
     require(bool(reached & transistor_pins), "Routed D network does not reach a transistor")
@@ -200,9 +276,18 @@ def rc_metrics(net: dict) -> dict:
         "capacitance_min_f": min(c["value"] for c in net["capacitors"]),
         "capacitance_max_f": max(c["value"] for c in net["capacitors"]),
         "drain_resistor_count": len(drain_r),
+        "drain_external_port": "D",
+        "drain_transistor_terminals": sorted(reached & transistor_pins),
+        "drain_internal_nodes": sorted(reached - set(net["ports"])),
+        "drain_branch_nodes": branch_nodes,
+        "drain_resistor_names": [r["name"] for r in drain_r],
         "drain_resistance_sum_ohm": sum(r["value"] for r in drain_r),
         "drain_capacitance_sum_f": sum(c["value"] for c in drain_c),
         "total_capacitance_f": sum(c["value"] for c in net["capacitors"]),
+        "floating_annotated_capacitors_checked": [
+            c["name"] for c in net["capacitors"] if "FLOATING" in c.get("annotation", "").upper()
+        ],
+        "terminal_components": {port: sorted(nodes) for port, nodes in components.items()},
         "resistors": net["resistors"], "capacitors": net["capacitors"],
     }
 
@@ -231,6 +316,8 @@ def run_magic(out: Path, spec: dict, mode: str, route_length: int = 0) -> None:
                       out / "logs" / f"{spec['cell']}-magic.log", out, env,
                       f"source {{{script.as_posix()}}}\n")
     require(f"PREFLIGHT_MAGIC_COMPLETE {spec['cell']}" in text, "Magic did not finish")
+    require("ambiguous" not in text.lower() and "deprecated" not in text.lower(),
+            "Ambiguous/deprecated Magic command; inspect the raw tool log")
 
 
 def check_layout(out: Path, cell: str, negative: bool = False) -> dict:
@@ -239,36 +326,63 @@ def check_layout(out: Path, cell: str, negative: bool = False) -> dict:
     match = re.search(r"^count: (\d+)$", report, re.MULTILINE)
     require(match is not None, "Missing DRC result")
     count = int(match[1])
-    require("technology: sky130A" in report and "drc(full)" in report,
+    require("technology: sky130A" in report and "drc_style: drc(full)" in report,
             "Wrong/inactive DRC technology or style")
+    log = (out / "logs" / f"{cell}-magic.log").read_text()
+    require(f"PREFLIGHT_DRC_STYLE {cell} drc(full)" in log and
+            'The current style is "drc(full)"' in log, "Missing raw DRC style confirmation")
     require(count > 0 if negative else count == 0, f"DRC count {count}: {report}")
+    landing = None
     if not negative:
         require({"D", "G", "S", "B"} <= set(mag["labels"]), "Missing four terminal labels")
         require({"65/20", "66/20", "68/20"} <= gds["geometry_by_layer"].keys(),
                 "GDS lacks active, poly, or metal1")
-    return {"drc_count": count, "drc_style": "drc(full)", "mag": mag, "gds": gds}
+        scale = re.search(r"^grid_um: ([0-9.eE+-]+)$", report, re.MULTILINE)
+        require(scale is not None, "Missing actual Magic grid scale")
+        landing = metal1_area_at_pin_um2(mag, "G", float(scale[1]))
+        require(landing >= 0.10, f"Connected gate metal1 area lacks margin: {landing} um2")
+        if cell.startswith("route_"):
+            require(gds["geometry_by_layer"].get("68/44", 0) >= 2 and
+                    gds["geometry_by_layer"].get("69/20", 0) > 0,
+                    "Branched probe lacks two physical via1 contacts and metal2")
+    return {"drc_count": count, "drc_style": "drc(full)",
+            "gate_metal1_area_um2": landing, "mag": mag, "gds": gds}
+
+
+def lvs_outcome(text: str, mutation: str | None) -> dict:
+    marker = re.search(r"PREFLIGHT_LVS_RESULT (-?\d+) (-?\d+)", text)
+    require(marker is not None, "Missing explicit Netgen comparison result")
+    equivalent, unique = map(int, marker.groups())
+    require(equivalent != -1 and unique != -1, "No real LVS comparison or a black box")
+    passed = equivalent == 1 and unique == 1
+    require(passed if mutation is None else not passed,
+            f"LVS {'positive' if mutation is None else mutation} control had wrong outcome")
+    if mutation == "width":
+        require(unique in (-3, -4), "Width control did not detect a property mismatch")
+    return {"equivalent": equivalent, "unique": unique, "expected_match": mutation is None}
 
 
 def run_lvs(out: Path, spec: dict, mutation: str | None = None) -> dict:
     cell = spec["cell"]
+    layout = out / f"{cell}.lvs.spice"
+    check_device(read_spice(layout), spec)
+    ports = re.findall(r'^port "([^"]+)" (\d+) ', (out / f"{cell}.ext").read_text(), re.MULTILINE)
+    require(sorted(ports, key=lambda p: int(p[1])) == [("D", "1"), ("G", "2"), ("S", "3"), ("B", "4")],
+            f"Missing/misordered real extraction ports: {ports}")
     suffix = mutation or "positive"
     reference = out / f"{cell}-{suffix}.reference.spice"
     reference.write_text(independent_reference(spec, mutation))
+    reference_net = read_spice(reference)
     env = dict(os.environ, PREFLIGHT_CELL=cell,
-               PREFLIGHT_LAYOUT=str(out / f"{cell}.lvs.spice"),
+               PREFLIGHT_LAYOUT=str(layout),
                PREFLIGHT_REFERENCE=str(reference), PREFLIGHT_SETUP=str(HERE / "strict_setup.tcl"),
                PREFLIGHT_LVS_REPORT=str(out / f"{cell}-{suffix}.lvs.txt"))
     text = run_logged(["netgen", "-batch", "source", str(HERE / "lvs.tcl")],
                       out / "logs" / f"{cell}-{suffix}-netgen.log", out, env)
-    require(text.count("PREFLIGHT_DEVICE_CLASS") >= 2, "Primitive classes were not asserted")
-    marker = re.search(r"PREFLIGHT_LVS_RESULT ([01]) (-?\d+)", text)
-    require(marker is not None, "Missing explicit Netgen comparison result")
-    equivalent, unique = map(int, marker.groups())
-    passed = equivalent == 1 and unique == 1
-    require(passed if mutation is None else not passed,
-            f"LVS {'positive' if mutation is None else mutation} control had wrong outcome")
-    require(unique != -1, "LVS was reduced to a black box")
-    return {"equivalent": equivalent, "unique": unique, "expected_match": mutation is None}
+    for circuit, model in ((1, spec["model"]), (2, reference_net["devices"][0]["model"])):
+        require(f"PREFLIGHT_DEVICE_CLASS {circuit} {model} {MODELS[model]}" in text,
+                f"Distinct four-terminal primitive class not asserted: {circuit} {model}")
+    return lvs_outcome(text, mutation)
 
 
 def main(out: Path) -> int:
@@ -281,10 +395,13 @@ def main(out: Path) -> int:
         "commit": os.environ.get("GITHUB_SHA"),
         "run_url": f"https://github.com/{repository}/actions/runs/{run_id}"
         if repository and run_id else None,
-        "geometry_units": "micrometres; Magic extract style ngspice",
+        "geometry_units": "micrometres; Magic extract style ngspice()",
         "drc_style": "sky130A drc(full), Euclidean on",
         "pex_settings": {"threshold_milliohm": 0, "minresist_milliohm": 0,
                          "mindelay_ps": 0, "cthresh_ff": 0},
+        "route_topology": "two_contact_fork; two via1 contacts 2um apart on the same drain",
+        "route_spans_um": [20, 400],
+        "prior_failed_receipt": "verification_receipt.json (attempts 1/2, unchanged)",
     }
     (out / "run-context.json").write_text(json.dumps(context, indent=2) + "\n")
     specs = json.loads((HERE / "devices.json").read_text())
@@ -325,13 +442,14 @@ def main(out: Path) -> int:
         run_magic(out, spacing_spec, "spacing"), check_layout(out, "spacing_bad", True))[1])
 
     routes = {}
-    for cell, length in (("route_short", 20), ("route_long", 200)):
+    for cell, length in (("route_short", 20), ("route_long", 400)):
         spec = dict(specs[0], cell=cell)
 
         def make_route(s=spec, length=length):
             shutil.copyfile(out / "n_input3.mag", out / f"{s['cell']}.mag")
             run_magic(out, s, "route", length)
-            return {"route_horizontal_leg_um": length, "route_width_um": 0.36}
+            return {"route_span_um": length, "route_width_um": 0.36,
+                    "topology": "two_contact_fork", "physical_via1_contacts": 2}
 
         generated = record(f"{cell}: routed extraction", make_route)
         if generated is None:
@@ -344,12 +462,15 @@ def main(out: Path) -> int:
             rc = read_spice(out / f"{s['cell']}.rc.spice")
             check_device(c_only, s, connectivity=False)
             check_device(rc, s, connectivity=False)
+            terminal_components(c_only)
             require(c_only["capacitors"] and not c_only["resistors"],
                     "C-only result missing C or mixed with R")
             require((out / f"{s['cell']}.res.ext").stat().st_size > 0,
                     "No real extresist intermediate")
             metrics = rc_metrics(rc)
             metrics["c_only_capacitor_count"] = len(c_only["capacitors"])
+            metrics["c_only_capacitors"] = c_only["capacitors"]
+            metrics["route_geometry"] = (out / f"{s['cell']}.route.txt").read_text()
             return metrics
 
         metrics = record(f"{cell}: actual distributed RC", check_pex)

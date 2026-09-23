@@ -10,6 +10,17 @@ proc pin_order {} {
     }
 }
 
+proc gate_landing {} {
+    findlabel G
+    set terminal [sky130::getbox]
+    set x [expr {([lindex $terminal 0] + [lindex $terminal 2]) / 2.0}]
+    set y [expr {([lindex $terminal 1] + [lindex $terminal 3]) / 2.0}]
+    # Extend the existing gate landing north, away from source/drain metal.
+    box_um [expr {$x - 0.15}] [expr {$y - 0.11}] \
+        [expr {$x + 0.15}] [expr {$y + 0.29}]
+    paint metal1
+}
+
 proc save_and_check {cell} {
     select top cell
     expand
@@ -22,10 +33,15 @@ proc save_and_check {cell} {
     foreach {reason rectangles} $reasons {
         incr count [llength $rectangles]
     }
+    set style [drc list style]
+    if {$style ne "drc(full)"} {error "Unexpected active DRC style: $style"}
+    drc style
+    puts "PREFLIGHT_DRC_STYLE $cell $style"
     set report [open ${cell}.drc.txt w]
     puts $report "cell: $cell"
     puts $report "technology: [tech name]"
-    puts $report "drc_style: [drc style]"
+    puts $report "drc_style: $style"
+    puts $report "grid_um: [cif scale out]"
     puts $report "count: $count"
     puts $report $reasons
     close $report
@@ -35,7 +51,7 @@ proc save_and_check {cell} {
 }
 
 proc connectivity {cell} {
-    extract style ngspice
+    extract style ngspice()
     extract no resistance
     extract do capacitance
     extract do coupling
@@ -43,6 +59,8 @@ proc connectivity {cell} {
     ext2spice lvs
     ext2spice blackbox off
     ext2spice hierarchy off
+    ext2spice subcircuit on
+    ext2spice subcircuit top on
     ext2spice merge none
     ext2spice scale off
     ext2spice -o ${cell}.lvs.spice
@@ -53,29 +71,45 @@ proc routed_probe {cell length} {
     set terminal [sky130::getbox]
     set x [expr {([lindex $terminal 0] + [lindex $terminal 2]) / 2.0}]
     set y [expr {([lindex $terminal 1] + [lindex $terminal 3]) / 2.0}]
-    # Move the external drain port to the far end, not an ideal short alias.
+    # Two physical contacts on the same 3um drain create parallel loaded paths.
+    # The external port is on a separate trunk, not an ideal short alias.
     erase labels
-    box_um [expr {$x - 0.13}] [expr {$y - 0.13}] \
-        [expr {$x + 0.13}] [expr {$y + 0.13}]
-    sky130::via1_draw
     set left [expr {$x - $length}]
-    set top [expr {$y + 10.0}]
-    box_um $left [expr {$y - 0.18}] [expr {$x + 0.18}] [expr {$y + 0.18}]
+    set junction [expr {$x - $length / 2.0}]
+    foreach offset {-1.0 1.0} {
+        set contact_y [expr {$y + $offset}]
+        box_um [expr {$x - 0.13}] [expr {$contact_y - 0.13}] \
+            [expr {$x + 0.13}] [expr {$contact_y + 0.13}]
+        sky130::via1_draw
+        box_um [expr {$junction - 0.18}] [expr {$contact_y - 0.18}] \
+            [expr {$x + 0.18}] [expr {$contact_y + 0.18}]
+        paint metal2
+    }
+    box_um [expr {$left - 0.18}] [expr {$y - 0.18}] \
+        [expr {$junction + 0.18}] [expr {$y + 0.18}]
     paint metal2
-    box_um $left [expr {$y - 0.18}] [expr {$left + 0.36}] [expr {$top + 0.18}]
+    box_um [expr {$junction - 0.18}] [expr {$y - 1.18}] \
+        [expr {$junction + 0.18}] [expr {$y + 1.18}]
     paint metal2
-    box_um $left [expr {$top - 0.18}] [expr {$x + 0.18}] [expr {$top + 0.18}]
-    paint metal2
-    box_um $x $top $x $top
+    box_um $left $y $left $y
     label D c metal2
     port make 1
     pin_order
+    set report [open ${cell}.route.txt w]
+    puts $report "topology: two_contact_fork"
+    puts $report "span_um: $length"
+    puts $report "metal2_width_um: 0.36"
+    puts $report "drain_port_um: $left $y"
+    puts $report "junction_um: $junction $y"
+    puts $report "upper_contact_um: $x [expr {$y + 1.0}]"
+    puts $report "lower_contact_um: $x [expr {$y - 1.0}]"
+    close $report
     save_and_check $cell
     connectivity $cell
 
     ext2spice extresist off
     ext2spice cthresh 0
-    ext2spice -y 6 -o ${cell}.c.spice
+    ext2spice -o ${cell}.c.spice
 
     # These are milliohms (threshold/minresist) and picoseconds (mindelay).
     # Do not use the obsolete extresist tolerance setting.
@@ -89,7 +123,7 @@ proc routed_probe {cell length} {
     ext2spice extresist on
     ext2spice cthresh 0
     ext2spice rthresh 0
-    ext2spice -y 6 -o ${cell}.rc.spice
+    ext2spice -o ${cell}.rc.spice
 }
 
 proc main {} {
@@ -114,6 +148,7 @@ proc main {} {
                 }
             }
             sky130::${model}_draw $checked
+            gate_landing
             pin_order
             save_and_check $cell
             connectivity $cell
