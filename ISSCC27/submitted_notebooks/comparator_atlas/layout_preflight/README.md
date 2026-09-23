@@ -39,6 +39,9 @@ The accepted four-terminal primitive alternative is used instead of an inverter.
 Each of the ten independent cells contains one transistor, actual PCell-generated
 contacts and a contacted guard/body ring, with explicit `D G S B` port order.
 All have `nf=1`, `m=1`; requested dimensions may not be silently clamped.
+The gate metal1 landing is extended north on the same connected polygon. Its
+actual M1/contact union area must be at least 0.10 um2, independently measured
+from the saved geometry and Magic's grid scale, in addition to passing DRC.
 
 | Primitive | W (um) | L (um) |
 |---|---:|---:|
@@ -51,6 +54,8 @@ The harness checks nonempty `.mag` rectangles and GDS layer geometry, extracted
 transistor count/model/W/L/m/bulk, and Magic **sky130A `drc(full)`**, with Euclidean
 distance enabled. A separate 0.07 um metal1 spacing violation must produce DRC
 errors. These are local open-source deck checks, not complete tapeout checks.
+The selected style is read with `drc list style` and corroborated by captured
+raw Magic output.
 
 The independent schematic reference is constructed from `devices.json`, never
 copied from the extracted netlist. Netgen explicitly recognizes the four-terminal
@@ -59,11 +64,18 @@ the unmodified generated SKY130 setup's W/L and bulk comparisons. No device is
 replaced by an empty black box. Four reference mutations must fail: gate/source
 short, incorrect bulk, doubled width, and SVT substituted for LVT. A tool exit
 code alone is not counted as an LVS match.
+Magic itself emits the named top with `ext2spice subcircuit top on`. Both its
+SPICE wrapper and the actual `.ext` port order are checked before Netgen starts;
+the harness does not manufacture a wrapper around an invalid extraction.
 
-Two PCell-based drain routes have 0.36 um metal2 width, 20/200 um horizontal
-legs, and a 10 um connecting leg. The genuine PDK via1 generator connects to the
-drain. The external drain port is at the far end, without a zero-ohm alias.
-Separate files contain:
+Two PCell-based branched drain probes have 0.36 um metal2 width and 20/400 um
+spans from the drain to the external port. A trunk reaches a fork halfway along
+the span; upper/lower arms connect through two genuine PDK-generated via1
+contacts, 2 um apart on the existing 3 um drain. This is a physical multi-contact
+network, not a hand-split resistance model. The external drain port is at the
+far end, without a zero-ohm alias. The larger span makes the geometry dependence
+clear against fixed contact/diffusion resistance; numerical criteria are not
+reduced. Separate files contain:
 
 - `*.lvs.spice`: connectivity only; no parasitic R or C.
 - `*.c.spice`: layout-derived capacitance without distributed resistance.
@@ -74,12 +86,17 @@ Separate files contain:
 The pinned modern Magic interface uses `threshold`/`minresist` in milliohms and
 `mindelay` in picoseconds, not deprecated `tolerance`. The harness requires
 positive R/C values, multiple connected resistors between the external drain and
-a transistor terminal, internal nodes, and increasing extracted drain RC for
-the longer route. It records every resistor/capacitor value in `capabilities.json`.
+a transistor terminal, an extracted branch junction, internal nodes, and
+increasing extracted drain RC for the longer route. Every MOS terminal and
+parasitic node must be DC-connected to the correct external port without shorts.
+`FLOATING`-annotated capacitances are retained and checked, not deleted.
+It records every resistor/capacitor value, the drain component's element names,
+terminal memberships, branch nodes, and actual route coordinates in
+`capabilities.json`.
 Resistance sums describe the extracted component, not an AC impedance or a
 general effective resistance measurement.
 
-The `ngspice` extraction style emits device geometry in **micrometres**; the
+The explicit `ngspice()` extraction style emits device geometry in **micrometres**; the
 unscaled W/L values are checked directly and extra scale directives are rejected.
 No SPICE smoke simulation is included. The earlier schematic-model source is
 `google/skywater-pdk-libs-sky130_fd_pr` at
@@ -109,6 +126,12 @@ GDS, Magic layouts, connectivity/C/RC netlists, `.ext`/`.res.ext`, independent
 references, DRC/LVS reports, and source/deck/binary/artifact hashes. Successful
 installation alone is not a passed layout. Execution receipts and the actual
 capability outcome are reported separately after inspecting downloaded evidence.
+
+A subsequent bounded decision authorized up to two more runs (attempts 3/4,
+each at most 30 minutes) to repair concrete implementation defects. The initial
+`verification_receipt.json`, both original runs, and the following historical
+failure analysis remain unchanged. Further runs do not retrospectively turn the
+initial 12 PASS / 42 FAIL result green.
 
 Original harness code is MIT licensed under the parent project's license.
 Fetched third-party sources retain their own licenses. Magic, open_pdks and
