@@ -39,6 +39,11 @@ The accepted four-terminal primitive alternative is used instead of an inverter.
 Each of the ten independent cells contains one transistor, actual PCell-generated
 contacts and a contacted guard/body ring, with explicit `D G S B` port order.
 All have `nf=1`, `m=1`; requested dimensions may not be silently clamped.
+The wrapper sets `units internal` before `snap internal` and PCell calls, using
+Magic's supported coordinate contract without editing the PDK or hiding warnings.
+It removes the generated `FIXED_BBOX` abutment metadata before painting the gate
+landing, so Magic recomputes the full physical bounds including the guard ring.
+No paint or DRC rule is removed; area selection and DRC cover the full cell.
 The gate metal1 landing is extended north on the same connected polygon. Its
 actual M1/contact union area must be at least 0.10 um2, independently measured
 from the saved geometry and Magic's grid scale, in addition to passing DRC.
@@ -68,14 +73,22 @@ Magic itself emits the named top with `ext2spice subcircuit top on`. Both its
 SPICE wrapper and the actual `.ext` port order are checked before Netgen starts;
 the harness does not manufacture a wrapper around an invalid extraction.
 
-Two PCell-based branched drain probes have 0.36 um metal2 width and 20/400 um
-spans from the drain to the external port. A trunk reaches a fork halfway along
-the span; upper/lower arms connect through two genuine PDK-generated via1
-contacts, 2 um apart on the existing 3 um drain. This is a physical multi-contact
-network, not a hand-split resistance model. The external drain port is at the
-far end, without a zero-ohm alias. The larger span makes the geometry dependence
-clear against fixed contact/diffusion resistance; numerical criteria are not
-reduced. Separate files contain:
+Two PCell-based branched drain probes have 0.36 um metal2 width and 20/800 um
+spans from the devices to the external port. Each contains two separately drawn
+3/0.15 um SVT NFETs, separated by 12 um, with independent gates and sources.
+The actual top ports are `D G S B G2 S2`; the independent two-device reference
+requires `D/G/S/B` and `D/G2/S2/B`, including both devices' W/L/m and body checks.
+Both gate landings are checked. Real guard-ring taps are joined with a 0.20 um
+local-interconnect route outside the device cores.
+
+A metal2 trunk reaches a fork halfway along the span; upper/lower arms connect
+through genuine PDK-generated via1 contacts to the **two distinct drain loads**.
+This is physical branching, not hand-split resistance. Unlike attempt 3's two
+contacts on one drain, these independently gated/sourced devices provide
+distinct extraction endpoints. The external drain port is at the far end,
+without a zero-ohm alias. The longer 800 um span distinguishes wire-length
+dependence from the two fixed contact/diffusion loads; the greater-than-three
+R/C ratio criteria are unchanged. Separate files contain:
 
 - `*.lvs.spice`: connectivity only; no parasitic R or C.
 - `*.c.spice`: layout-derived capacitance without distributed resistance.
@@ -86,7 +99,7 @@ reduced. Separate files contain:
 The pinned modern Magic interface uses `threshold`/`minresist` in milliohms and
 `mindelay` in picoseconds, not deprecated `tolerance`. The harness requires
 positive R/C values, multiple connected resistors between the external drain and
-a transistor terminal, an extracted branch junction, internal nodes, and
+both distinct transistor drain endpoints, an extracted branch junction, internal nodes, and
 increasing extracted drain RC for the longer route. Every MOS terminal and
 parasitic node must be DC-connected to the correct external port without shorts.
 `FLOATING`-annotated capacitances are retained and checked, not deleted.
@@ -132,6 +145,18 @@ each at most 30 minutes) to repair concrete implementation defects. The initial
 `verification_receipt.json`, both original runs, and the following historical
 failure analysis remain unchanged. Further runs do not retrospectively turn the
 initial 12 PASS / 42 FAIL result green.
+
+Attempt 3, [run 35811055218](https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/actions/runs/35811055218),
+commit `6dba68679a94f7d6a34c6ee6e03345b726b14711`, executed Magic and Netgen and
+recorded **11 PASS / 13 FAIL**, with 30 downstream primitive checks skipped.
+Both routed structures passed genuine named-style DRC and positive LVS; all
+four negative LVS controls and the negative spacing control passed. The ten
+primitive generation checks rejected the exact units/snap deprecation warning,
+although the raw logs contain completed extraction and DRC. These warning-based
+failures are not evidence of illegal device geometry. Both drain forks reduced
+to one drain resistor (37.8702 / 135.924 ohm), so distributed-route RC and its
+acceptance comparison remained unproven. All 135 artifact-manifest entries were
+verified. Attempt 4 is the sole remaining authorized run; no fifth run is allowed.
 
 Original harness code is MIT licensed under the parent project's license.
 Fetched third-party sources retain their own licenses. Magic, open_pdks and
