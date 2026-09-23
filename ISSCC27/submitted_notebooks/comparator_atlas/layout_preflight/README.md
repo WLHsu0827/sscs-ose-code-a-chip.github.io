@@ -97,6 +97,13 @@ Never place the root workflow on the submitted branch or upstream; do not open
 a formal PR for this preflight. The job is limited to 30 minutes, with a 24-minute
 toolchain timeout and an always-run artifact upload.
 
+On that verification branch only, exclude the same branch from the inherited
+`lint.yaml` and `run.yaml` push triggers so they do not start an unrelated
+historical-notebook checkout. The scoped workflow uses an unauthenticated,
+shallow, sparse fetch of this public fork at `GITHUB_SHA`, never recursive
+submodule operations. This avoids the historical dangling submodule entry that
+caused the first attempt's checkout-action credential cleanup to fail.
+
 At most two initial remote runs are authorized. CI artifacts contain the actual
 GDS, Magic layouts, connectivity/C/RC netlists, `.ext`/`.res.ext`, independent
 references, DRC/LVS reports, and source/deck/binary/artifact hashes. Successful
