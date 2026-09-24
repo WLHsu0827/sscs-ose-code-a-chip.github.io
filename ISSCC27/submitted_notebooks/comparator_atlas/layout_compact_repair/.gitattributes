@@ -1,0 +1,4 @@
+* text eol=lf
+*.gds -text
+*.npz -text
+*.zip -text
