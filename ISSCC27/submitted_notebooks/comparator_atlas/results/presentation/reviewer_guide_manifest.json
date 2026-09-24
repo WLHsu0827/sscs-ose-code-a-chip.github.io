@@ -1,7 +1,6 @@
 {
-  "status": "current_competition_materials_from_verified_evidence",
-  "generator_sha256": "3e5cc2ec4530d9cb461bca5f9b17c4595c015a86a95545d2c33c6ecb580fc54e",
-  "release_facts_source_sha256": "69109e2883060ff3c9c08bef40ec07d82bf87c738770f8f52d4305d294e74e2f",
+  "status": "competition_guide_generated_from_checked_evidence",
+  "source_sha256": "69109e2883060ff3c9c08bef40ec07d82bf87c738770f8f52d4305d294e74e2f",
   "facts": {
     "authors": [
       {
@@ -70,22 +69,7 @@
       "layout_compact_repair/verification-receipt.json": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490"
     }
   },
-  "data_evidence_sha256": {
-    "entry_metadata.json": "cf9f9fafa55680e153dedf6a392d02bcd057bc59e96d5a1e2045a6271fe94ed5",
-    "results/study/selection.json": "c0baa56712d07e537c8c0789d42532d545e6ecfc46b09ff563ef5884968c83f0",
-    "results/study/verified_measurements.csv": "6b645926fc80e105020d44b7f5ba56b7bb551acad80602b633de025b7c81d722",
-    "results/study/professional/measurements.csv": "b1e238cd6600a8b2c6423daa89ed06539506191da388c6b47af50f645e156eed",
-    "layout_compact_repair/verification-receipt.json": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490"
-  },
-  "validation_manifest_sha256": "84466bdfc4b9051db25f7ddf87d9cd28c3c66efc0b1b5775b8e198127b4a55ef",
-  "stress_manifest_sha256": "cab8ac38a1e268b471b4e53399199842be0eca2e75ac2b69da8effe8ce1022d6",
-  "layout_receipt_sha256": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490",
-  "artifact_sha256": {
-    "Comparator_Atlas_Poster.pdf": "6e31077101f4c89a70f59204107fd7611fdb6fd9de7cf8e5873560f55656a4ab",
-    "poster_preview.png": "97e5dc4b790aba9d3144c312136bb0b3402bbd66b4a5e484d5cf300624a16158",
-    "abstract.txt": "1b23408b0300a64c020ced963b726f6893944bc29b6821ef5b6ac2a8bfe7d74a"
-  },
-  "reviewer_guide_sha256": "1fb4b6eceee359dad99525679b69431fba4292ed01d5dcd517ea716c035179bc",
-  "public_upload_performed": false,
-  "new_physical_experiments": 0
+  "guide_sha256": "1fb4b6eceee359dad99525679b69431fba4292ed01d5dcd517ea716c035179bc",
+  "new_physical_simulations": 0,
+  "public_upload_performed": false
 }

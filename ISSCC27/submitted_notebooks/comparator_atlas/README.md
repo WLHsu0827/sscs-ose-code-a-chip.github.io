@@ -7,6 +7,10 @@ educational workflow. Original project license: MIT.
 
 ## Review the entry
 
+[**Read the executed notebook**](https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/blob/wlhsu0827-comparator-atlas-isscc27/ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb) |
+[**Run the current submission in Colab**](https://colab.research.google.com/github/WLHsu0827/sscs-ose-code-a-chip.github.io/blob/wlhsu0827-comparator-atlas-isscc27/ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb) |
+[**Three-minute reviewer guide and demo notes**](REVIEWER_GUIDE.md)
+
 Open **Comparator_Atlas.ipynb** and run all cells with Python 3.10 or newer.
 The default mode verifies the supplied source/protocol/result hashes,
 recomputes corrected comparisons, renders actual GDS and extracts measurements
@@ -24,11 +28,15 @@ python -m nbqa flake8 --ignore=E402,E226 Comparator_Atlas.ipynb
 On Windows, use a short checkout location. Deeply nested extraction paths can
 exceed the legacy path-length limit; no system path policy is changed by setup.
 
-The notebook includes the official-owner Colab badge. When opened without its
+The direct Colab link above opens the author's submitted branch **before**
+upstream merge. The notebook also retains the required official-owner Colab
+badge, whose upstream main-branch target becomes available after merge.
+When opened without its
 supporting files, it fetches only this project directory from the author's
-public submission branch using a sparse Git checkout. The official main-branch
-badge becomes available after upstream merge; before then use the same notebook
-on the author's fork. Neither route downloads the historical notebook corpus.
+public submission branch using a sparse Git checkout. A complete existing
+download is reused after restarting the runtime; an incomplete checkout is
+reported rather than overwritten. Neither route downloads the historical
+notebook corpus.
 
 **Offline interactive report:** download and open `results/study/report.html`.
 It embeds all figures, data and scripts; no server, CDN or tracking is required.

@@ -35,11 +35,14 @@ jobs:
       - name: Measurement and evidence tests
         working-directory: ISSCC27/submitted_notebooks/comparator_atlas
         run: |
-          python -m pytest -q tests presentation/test_circuit_guide.py
+          python -m pytest -q tests presentation
           node --test tests/test_explorer.mjs
       - name: Execute the complete reviewer notebook
         working-directory: ISSCC27/submitted_notebooks/comparator_atlas
         run: python -m pytest --nbmake --nbmake-timeout=600 Comparator_Atlas.ipynb
+      - name: Verify public notebook-only download and runtime restart
+        working-directory: ISSCC27/submitted_notebooks/comparator_atlas
+        run: python scripts/verify_notebook_bootstrap.py --artifact public_bootstrap.json
       - name: Install a fresh native Linux SPICE tool
         run: |
           sudo apt-get update -qq
@@ -55,4 +58,5 @@ jobs:
           name: linux-python310-review
           path: |
             ISSCC27/submitted_notebooks/comparator_atlas/linux_live_smoke.csv
+            ISSCC27/submitted_notebooks/comparator_atlas/public_bootstrap.json
           if-no-files-found: ignore
