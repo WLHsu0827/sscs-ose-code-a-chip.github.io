@@ -263,3 +263,4 @@ def full_reproduction() -> None:
     for stage in ("optimize", "study", "stress"):
         subprocess.run([sys.executable, "-m", "comparator_atlas", stage], cwd=ROOT, check=True)
     subprocess.run([sys.executable, "-m", "comparator_atlas.professional_audit"], cwd=ROOT, check=True)
+    subprocess.run([sys.executable, "-m", "presentation.waveform_lab"], cwd=ROOT, check=True)

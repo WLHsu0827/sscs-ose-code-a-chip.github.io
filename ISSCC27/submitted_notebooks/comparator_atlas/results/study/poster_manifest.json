@@ -1,7 +1,7 @@
 {
   "status": "current_competition_materials_from_verified_evidence",
   "generator_sha256": "3e5cc2ec4530d9cb461bca5f9b17c4595c015a86a95545d2c33c6ecb580fc54e",
-  "release_facts_source_sha256": "69109e2883060ff3c9c08bef40ec07d82bf87c738770f8f52d4305d294e74e2f",
+  "release_facts_source_sha256": "87012a3318a559af587b3257830547e12e289cfb3c5baa6da4eee006df893cad",
   "facts": {
     "authors": [
       {
@@ -85,7 +85,7 @@
     "poster_preview.png": "97e5dc4b790aba9d3144c312136bb0b3402bbd66b4a5e484d5cf300624a16158",
     "abstract.txt": "1b23408b0300a64c020ced963b726f6893944bc29b6821ef5b6ac2a8bfe7d74a"
   },
-  "reviewer_guide_sha256": "1fb4b6eceee359dad99525679b69431fba4292ed01d5dcd517ea716c035179bc",
+  "reviewer_guide_sha256": "c41393b8ef50cc56751f2655289ae57439bad591e35fa6e5fd4bbfecec7eb0e8",
   "public_upload_performed": false,
   "new_physical_experiments": 0
 }

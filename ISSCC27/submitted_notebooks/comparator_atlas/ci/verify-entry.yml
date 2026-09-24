@@ -36,7 +36,7 @@ jobs:
         working-directory: ISSCC27/submitted_notebooks/comparator_atlas
         run: |
           python -m pytest -q tests presentation
-          node --test tests/test_explorer.mjs
+          node --test tests/test_explorer.mjs tests/test_waveform_lab.mjs
       - name: Execute the complete reviewer notebook
         working-directory: ISSCC27/submitted_notebooks/comparator_atlas
         run: python -m pytest --nbmake --nbmake-timeout=600 Comparator_Atlas.ipynb

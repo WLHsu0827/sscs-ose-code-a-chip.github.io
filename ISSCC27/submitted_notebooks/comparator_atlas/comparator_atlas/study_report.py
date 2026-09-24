@@ -263,9 +263,11 @@ def paired_energy(frame: pd.DataFrame, selected_name: str) -> dict:
 
 def render_study() -> Path:
     import layout_evidence as physical
+    from presentation import waveform_lab
 
     frame, reports, manifest = load_validation()
     layout = physical.load_layout()
+    waveform_data = waveform_lab.load_lab()
     numerical, operating, stress = load_stress()
     optimization = checked_manifest("optimization_manifest.json")
     selection = json.loads((STUDY / "selection.json").read_text())
@@ -315,6 +317,9 @@ def render_study() -> Path:
     payload = json.dumps(cube, separators=(",", ":"), allow_nan=False).replace("<", "\\u003c")
     javascript_path = Path(__file__).parent / "assets" / "explorer.mjs"
     javascript = javascript_path.read_text(encoding="utf-8")
+    waveform_javascript_path = STUDY.parents[1] / "presentation" / "waveform_explorer.mjs"
+    waveform_javascript = waveform_javascript_path.read_text(encoding="utf-8")
+    waveform_payload = json.dumps(waveform_data, separators=(",", ":"), allow_nan=False).replace("<", "\\u003c")
     numerical_status = "PASS" if stress["numerical_passed"] else "REQUIRES REVIEW"
     warnings = sum(len(receipt["warnings"]) for receipt in (optimization, manifest, stress))
     total_runs = len(set(optimization["run_ids"]) | set(manifest["run_ids"]) | set(stress["run_ids"]))
@@ -411,7 +416,22 @@ label{{display:flex;align-items:center;gap:6px;font-size:13px}}select{{padding:8
 #explorer-stats{{font-weight:700;color:#076e66}}#explorer-detail{{min-height:65px;padding:14px;background:#f0f5f9;border-radius:8px;font-size:13px}}
 .legend{{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin:12px 0}}.swatch{{width:12px;height:12px;display:inline-block;margin-right:5px}}
 .metric{{font-weight:700;color:#087f76}}.split{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}}
+.waveform-presets{{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}}
+.waveform-presets button{{border:1px solid #c4d6e0;border-radius:7px;background:#f1f7fa;padding:9px 12px;color:var(--ink);cursor:pointer}}
+.waveform-presets button:focus-visible,#waveform-sample:focus-visible,#waveform-deadline:focus-visible{{outline:3px solid #159e92;outline-offset:2px}}
+.waveform-controls{{display:grid;grid-template-columns:minmax(230px,1.4fr) minmax(220px,1fr);gap:20px;align-items:center}}
+.waveform-controls label{{display:block}}.waveform-controls select,.waveform-controls input{{display:block;width:100%;margin-top:7px}}
+.waveform-controls output{{font-weight:700;color:#087f76}}#waveform-plot svg{{display:block;width:100%;height:auto}}
+#waveform-status{{font-size:18px;font-weight:700;padding:12px 15px;border-radius:8px;background:#edf5f7;margin:18px 0}}
+#waveform-status[data-outcome="correct"]{{color:#08796b;background:#e8f7f1}}
+#waveform-status[data-outcome="wrong"]{{color:#a32b3f;background:#fff0f2}}
+#waveform-status[data-outcome="unresolved"]{{color:#885b10;background:#fff7e3}}
+.waveform-metrics{{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}}
+.waveform-metrics div{{background:#f2f6fa;border-radius:8px;padding:14px}}
+.waveform-metrics strong{{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}}
+#waveform-source{{font-size:11px;overflow-wrap:anywhere;color:var(--muted)}}#waveform-error{{color:#a32b3f;font-weight:700}}
 @media(max-width:700px){{main{{padding:10px}}section{{padding:18px}}.controls label{{width:100%}}}}
+@media(max-width:700px){{.waveform-controls,.waveform-metrics{{grid-template-columns:1fr}}}}
 @media print{{header{{padding:20px}}section{{break-inside:avoid}}.controls,#explorer-grid,#explorer-detail{{display:none}}}}
 </style>
 <header><small>REPRODUCIBLE ANALOG DESIGN / IEEE SSCS CODE-A-CHIP CANDIDATE</small>
@@ -475,6 +495,38 @@ The input guardband changes the scoring band, not the underlying outcomes. Dimme
 <span><i class="swatch" style="background:#d5dee9"></i>Zero input, unscored</span></div>
 <p id="explorer-stats" aria-live="polite"></p><div id="explorer-grid"></div>
 <p id="explorer-detail" role="status"></p></section>
+<section id="waveform-lab"><h2>03b / Why did this decision pass or fail?</h2>
+<p>Explore <strong>eight declared examples from actual retained waveforms</strong>.
+These are representative teaching cases, not the raw trace for every atlas cell and not a new validation set.
+Changing the deadline reads the same trace; it does not run SPICE or alter a circuit.</p>
+<div class="waveform-presets" role="group" aria-label="Guided waveform examples">
+<button type="button" data-waveform-example="schematic_untrimmed" data-waveform-deadline="1">1. Wrong is not late</button>
+<button type="button" data-waveform-example="schematic_calibrated" data-waveform-deadline="1">2. Same circuit, calibrated</button>
+<button type="button" data-waveform-example="layout_ss_cold_negative" data-waveform-deadline="1">3. A slow extracted decision</button>
+<button type="button" data-waveform-example="layout_ss_cold_negative" data-waveform-deadline="2">4. Read the retained 2 ns window</button>
+</div>
+<div class="waveform-controls">
+<label for="waveform-sample">Actual stored example<select id="waveform-sample"></select></label>
+<label for="waveform-deadline">Decision deadline: <output id="waveform-deadline-value" for="waveform-deadline"></output>
+<input id="waveform-deadline" type="range" aria-label="Recorded decision deadline"></label>
+</div>
+<p id="waveform-error" role="alert"></p>
+<p id="waveform-status" role="status" aria-live="polite"></p>
+<p id="waveform-scope" class="muted"></p>
+<div class="legend"><span><i class="swatch" style="background:#009c8d"></i>Q+</span>
+<span><i class="swatch" style="background:#cc5967"></i>Q-</span>
+<span><i class="swatch" style="background:#98a8bb"></i>Clock</span>
+<span>Horizontal dotted lines: fixed 80% / 20% supply thresholds</span></div>
+<div id="waveform-plot"></div>
+<p id="waveform-rails"></p>
+<div class="waveform-metrics">
+<div><strong>CORE-RAIL ENERGY</strong><span id="waveform-energy"></span></div>
+<div><strong>RETAINED DECISION-TIME MEASUREMENT</strong><span id="waveform-latency"></span></div>
+</div>
+<p class="muted">Core energy is measured over the entire 10 ns cycle and does not shrink when the display deadline moves.
+Cursor voltages use the original waveform samples; latency is a sampled measurement, not an exact crossing.
+For layout examples, the original 1 ns pilot remains failed even when an individual trace resolves by 2 ns.</p>
+<p id="waveform-source"></p></section>
 <section><h2>04 / Timing and resolution are coupled</h2>{pictures["policies.png"]}{pictures["guardbands.png"]}
 <p class="muted">The hardware comparison uses the same local 3.5 ns calibration policy.
 The 1 ns policy is a separate ablation: it minimizes the finite-deadline decision interval rather than
@@ -519,7 +571,9 @@ Their code, figures, performance claims and statistical assumptions are not reus
 and <a href="https://github.com/sscs-ose/sscs-ose-code-a-chip.github.io">current competition rules</a>.</li>
 </ul></section></main>
 <script id="atlas-cube" type="application/json">{payload}</script>
-<script type="module">{javascript}</script></html>"""
+<script id="waveform-lab-data" type="application/json">{waveform_payload}</script>
+<script type="module">{javascript}</script>
+<script type="module">{waveform_javascript}</script></html>"""
     path = STUDY / "report.html"
     path.write_text(html_body, encoding="utf-8")
     write_json(STUDY / "presentation_manifest.json", {
@@ -532,6 +586,9 @@ and <a href="https://github.com/sscs-ose/sscs-ose-code-a-chip.github.io">current
         if professional is not None else None,
         "layout_receipt_sha256": physical.RECEIPT_SHA256,
         "layout_review_source_sha256": sha256(physical.ROOT / "layout_evidence.py"),
+        "waveform_lab_data_sha256": sha256(waveform_lab.FOLDER / "waveform_lab.json"),
+        "waveform_lab_manifest_sha256": sha256(waveform_lab.FOLDER / "manifest.json"),
+        "waveform_ui_source_sha256": sha256(waveform_javascript_path),
         "artifact_sha256": {
             "report.html": sha256(path), "explorer_data.json": sha256(STUDY / "explorer_data.json"),
             **{str(Path("figures") / filename): sha256(figures / filename) for filename in pictures},

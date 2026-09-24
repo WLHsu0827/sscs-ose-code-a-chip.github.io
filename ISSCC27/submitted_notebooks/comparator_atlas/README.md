@@ -14,8 +14,9 @@ educational workflow. Original project license: MIT.
 Open **Comparator_Atlas.ipynb** and run all cells with Python 3.10 or newer.
 The default mode verifies the supplied source/protocol/result hashes,
 recomputes corrected comparisons, renders actual GDS and extracts measurements
-from six schematic and six post-layout RC waveforms. It does not silently
-perform a multi-hour simulation campaign.
+from saved schematic and post-layout RC waveforms. An eight-example Waveform
+lab adds interactive deadline cursors and rail-threshold explanations using
+the same retained data. It does not silently perform a multi-hour simulation.
 
 Install the review environment from this project directory:
 
@@ -55,6 +56,14 @@ design search, stronger lower-energy control, complete failure maps and an
 actual layout/DRC/LVS/PEX addendum. Wrong and late decisions remain visible.
 The original 1 ns physical pilot is not relabeled as passed when the same
 saved waveforms show that the sampled points resolve by 2 ns.
+
+The **Waveform lab** connects these labels to real output voltages.
+Explore a wrong-sign schematic point, the same circuit and input after trim,
+and six nominal-layout RC traces. Select one of the six already reported
+deadlines; the view shows both output rails and their fixed 80%/20% thresholds.
+Energy remains the full-cycle measurement as the display deadline moves.
+These eight post-hoc teaching cases are not every atlas waveform or a new
+validation set, and manipulating the controls launches no SPICE processes.
 
 ## Schematic research question and fair comparison
 

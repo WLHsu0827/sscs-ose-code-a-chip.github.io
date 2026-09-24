@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "report_sha256": "3681557577c84dac28c20f107a04f537180874c4b423ba7987413d4488a18be0",
+  "report_sha256": "a8c2b7bbf46fd7ed2b263d149b5f60a7b091704b2e878c142bf649b09caafb1b",
   "browser": "Edg/153.0.4234.48",
   "fixture": false,
   "views": [
@@ -40,12 +40,26 @@
     "posthoc2nsScopeDisclosed": true,
     "noFull45PvtClaim": true
   },
+  "waveformLab": {
+    "samples": 8,
+    "deadlineObservations": 48,
+    "guidedExamples": 4,
+    "original1nsFailurePreserved": true,
+    "cycleEnergyIndependentOfDisplayDeadline": true,
+    "explicitSourceIds": true,
+    "accessibleSvgAndControls": true,
+    "newSimulations": 0,
+    "keyboardDeadlineVerified": true
+  },
   "javascript_errors": 0,
   "external_network_requests": 0,
   "screenshots": [
     "report-desktop.png",
     "report-explorer.png",
     "report-layout.png",
-    "report-mobile.png"
+    "report-waveform-lab.png",
+    "report-mobile.png",
+    "report-waveform-mobile.png",
+    "report-waveform-mobile-chart.png"
   ]
 }

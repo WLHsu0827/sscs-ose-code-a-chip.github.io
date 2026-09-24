@@ -422,6 +422,65 @@ def main() -> None:
             )
         """),
         markdown("""
+        ### Waveform lab: wrong, late, or correct?
+
+        The controls below expose eight post-hoc teaching examples from
+        already recorded SPICE data. The full waveform is rechecked before
+        its excerpt is drawn. This is not a new performance experiment
+        or the full raw-waveform atlas.
+
+        Start with the **code-zero -1 mV schematic example**: its outputs
+        resolve to the wrong polarity. Switch to the same circuit and
+        input with calibration enabled, then to a cold-SS extracted RC
+        example. At 1 ns that RC trace is late; reading its saved 2 ns
+        observation does not retroactively pass the original 1 ns gate.
+
+        Horizontal dotted lines are the fixed 80% / 20% output rail
+        thresholds. The two cursor voltages, not only their difference,
+        determine whether the decision is valid. Core energy always
+        covers the complete saved 10 ns cycle.
+        """),
+        code("""
+        from presentation import waveform_lab
+
+        lab = waveform_lab.load_lab()
+
+
+        def inspect_waveform(example, deadline_ns):
+            figure, reading = waveform_lab.figure(
+                lab, example, deadline_ns
+            )
+            display(figure, pd.DataFrame([reading]))
+            plt.close(figure)
+
+
+        example_control = widgets.Dropdown(
+            options=[
+                (sample["label"], sample["id"])
+                for sample in lab["samples"]
+            ],
+            value="schematic_untrimmed",
+            description="Stored waveform",
+            style={"description_width": "initial"},
+            layout=widgets.Layout(width="95%"),
+        )
+        waveform_deadline = widgets.SelectionSlider(
+            options=lab["deadlines_ns"],
+            value=1.0,
+            description="Deadline (ns)",
+            continuous_update=False,
+            style={"description_width": "initial"},
+        )
+        waveform_output = widgets.interactive_output(
+            inspect_waveform,
+            {
+                "example": example_control,
+                "deadline_ns": waveform_deadline,
+            },
+        )
+        display(example_control, waveform_deadline, waveform_output)
+        """),
+        markdown("""
         ## 7. The input interface and calibration workload are not free
 
         Five original/selected PVT conditions are stressed with input history,

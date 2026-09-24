@@ -34,6 +34,13 @@ GitHub's normal HTML file viewer is not an interactive website preview.
    20/20.
    Both the success scope and the missed original target stay visible.
 
+The **Waveform lab** makes the distinction concrete: eight representative
+saved examples have a movable deadline, complementary output thresholds and
+source run identities. A wrong-sign schematic decision, its calibrated
+counterpart, and late extracted RC decisions are all visible. These examples
+are not every raw trace in the atlas and add no new validation coverage.
+Moving the display deadline does not rerun SPICE or reduce full-cycle energy.
+
 ## What Run all does
 
 Default execution checks supplied source/data hashes, recomputes tables and

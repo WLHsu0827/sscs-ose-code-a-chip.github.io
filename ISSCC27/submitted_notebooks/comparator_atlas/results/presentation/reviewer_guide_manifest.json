@@ -1,6 +1,6 @@
 {
   "status": "competition_guide_generated_from_checked_evidence",
-  "source_sha256": "69109e2883060ff3c9c08bef40ec07d82bf87c738770f8f52d4305d294e74e2f",
+  "source_sha256": "87012a3318a559af587b3257830547e12e289cfb3c5baa6da4eee006df893cad",
   "facts": {
     "authors": [
       {
@@ -69,7 +69,7 @@
       "layout_compact_repair/verification-receipt.json": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490"
     }
   },
-  "guide_sha256": "1fb4b6eceee359dad99525679b69431fba4292ed01d5dcd517ea716c035179bc",
+  "guide_sha256": "c41393b8ef50cc56751f2655289ae57439bad591e35fa6e5fd4bbfecec7eb0e8",
   "new_physical_simulations": 0,
   "public_upload_performed": false
 }
