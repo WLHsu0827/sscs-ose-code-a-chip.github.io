@@ -1,0 +1,217 @@
+{
+  "status": "topology_guide_checked_against_published_netlist",
+  "source_sha256": "7ca76515baa6ceff22d4b3e59aa88f12dd319ba5901a913e87f6b5884611588e",
+  "generator_sha256": "bae7c8b1a5bb32a9056d57476a6ab212d5ba43696b4c5bed3ce8f57220e47891",
+  "design": {
+    "name": "lvt_balanced_4b",
+    "input_device": "nfet_01v8_lvt",
+    "input_w": 3,
+    "tail_w": 7,
+    "latch_n_w": 1.0,
+    "latch_p_w": 2.0,
+    "reset_w": 1.0,
+    "trim_l": 1.0,
+    "trim_bits": 4,
+    "max_code": 15,
+    "transistor_count": 27,
+    "gate_area_proxy_um2": 20.549999999999997
+  },
+  "device_inventory": {
+    "Xinp": {
+      "drain": "xp",
+      "gate": "vinp",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xinn": {
+      "drain": "xn",
+      "gate": "vinn",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xtail": {
+      "drain": "tail",
+      "gate": "clk",
+      "source": "vss",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xln": {
+      "drain": "qn",
+      "gate": "qp",
+      "source": "xp",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xlp": {
+      "drain": "qp",
+      "gate": "qn",
+      "source": "xn",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xpn": {
+      "drain": "qn",
+      "gate": "qp",
+      "source": "vdd",
+      "bulk": "vdd",
+      "model": "sky130_fd_pr__pfet_01v8"
+    },
+    "Xpp": {
+      "drain": "qp",
+      "gate": "qn",
+      "source": "vdd",
+      "bulk": "vdd",
+      "model": "sky130_fd_pr__pfet_01v8"
+    },
+    "Xrxp": {
+      "drain": "xp",
+      "gate": "clk",
+      "source": "vdd",
+      "bulk": "vdd",
+      "model": "sky130_fd_pr__pfet_01v8"
+    },
+    "Xrxn": {
+      "drain": "xn",
+      "gate": "clk",
+      "source": "vdd",
+      "bulk": "vdd",
+      "model": "sky130_fd_pr__pfet_01v8"
+    },
+    "Xrqp": {
+      "drain": "qp",
+      "gate": "clk",
+      "source": "vdd",
+      "bulk": "vdd",
+      "model": "sky130_fd_pr__pfet_01v8"
+    },
+    "Xrqn": {
+      "drain": "qn",
+      "gate": "clk",
+      "source": "vdd",
+      "bulk": "vdd",
+      "model": "sky130_fd_pr__pfet_01v8"
+    },
+    "Xtp0": {
+      "drain": "xp",
+      "gate": "vinp",
+      "source": "sp0",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsp0": {
+      "drain": "sp0",
+      "gate": "tp0",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xtp1": {
+      "drain": "xp",
+      "gate": "vinp",
+      "source": "sp1",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsp1": {
+      "drain": "sp1",
+      "gate": "tp1",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xtp2": {
+      "drain": "xp",
+      "gate": "vinp",
+      "source": "sp2",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsp2": {
+      "drain": "sp2",
+      "gate": "tp2",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xtp3": {
+      "drain": "xp",
+      "gate": "vinp",
+      "source": "sp3",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsp3": {
+      "drain": "sp3",
+      "gate": "tp3",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xtn0": {
+      "drain": "xn",
+      "gate": "vinn",
+      "source": "sn0",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsn0": {
+      "drain": "sn0",
+      "gate": "tn0",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xtn1": {
+      "drain": "xn",
+      "gate": "vinn",
+      "source": "sn1",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsn1": {
+      "drain": "sn1",
+      "gate": "tn1",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xtn2": {
+      "drain": "xn",
+      "gate": "vinn",
+      "source": "sn2",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsn2": {
+      "drain": "sn2",
+      "gate": "tn2",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    },
+    "Xtn3": {
+      "drain": "xn",
+      "gate": "vinn",
+      "source": "sn3",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8_lvt"
+    },
+    "Xsn3": {
+      "drain": "sn3",
+      "gate": "tn3",
+      "source": "tail",
+      "bulk": "vss",
+      "model": "sky130_fd_pr__nfet_01v8"
+    }
+  },
+  "artifact_sha256": {
+    "circuit_guide.svg": "7d002f39dc4d72a740f26db081f192042d49fa0f299f75708de00047185d167e",
+    "circuit_guide.pdf": "aae6c25218a834e58ab0dbffec64b186614f24e59c8066e8c51e1b7998ab8a8a",
+    "circuit_guide.png": "85251526de98190bee17c78288e2051c7ad9075d5a06f91efa56d00853a33976"
+  },
+  "physical_layout_or_new_simulation_result": false,
+  "published_entry_updated": false
+}

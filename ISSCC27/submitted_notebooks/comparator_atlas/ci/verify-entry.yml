@@ -35,7 +35,7 @@ jobs:
       - name: Measurement and evidence tests
         working-directory: ISSCC27/submitted_notebooks/comparator_atlas
         run: |
-          python -m pytest -q tests
+          python -m pytest -q tests presentation/test_circuit_guide.py
           node --test tests/test_explorer.mjs
       - name: Execute the complete reviewer notebook
         working-directory: ISSCC27/submitted_notebooks/comparator_atlas

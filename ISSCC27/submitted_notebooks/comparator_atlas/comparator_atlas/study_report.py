@@ -6,6 +6,7 @@ import html
 import json
 from pathlib import Path
 import re
+import shutil
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
@@ -261,7 +262,10 @@ def paired_energy(frame: pd.DataFrame, selected_name: str) -> dict:
 
 
 def render_study() -> Path:
+    import layout_evidence as physical
+
     frame, reports, manifest = load_validation()
+    layout = physical.load_layout()
     numerical, operating, stress = load_stress()
     optimization = checked_manifest("optimization_manifest.json")
     selection = json.loads((STUDY / "selection.json").read_text())
@@ -288,6 +292,10 @@ def render_study() -> Path:
         "guardbands.png": lambda: guardband_figure(frame, name),
         "operating.png": lambda: operating_figure(operating, name),
         "cold_waveforms.png": lambda: cold_waveform_figure(reports, name),
+        "actual_layout.png": lambda: physical.layout_figure(layout),
+        "layout_deadlines.png": lambda: physical.deadline_figure(layout),
+        "layout_costs.png": lambda: physical.tt_cost_figure(layout),
+        "layout_waveforms.png": lambda: physical.review_layout_waveforms(layout)[1],
     }
     if professional is not None:
         factories["efficient_control.png"] = lambda: entry_tools.tradeoff_figure(professional)
@@ -298,6 +306,10 @@ def render_study() -> Path:
         plt.close(figure)
         data = base64.b64encode((figures / filename).read_bytes()).decode("ascii")
         pictures[filename] = f'<img alt="{filename}" src="data:image/png;base64,{data}">'
+    guide = physical.circuit_guide_path()
+    shutil.copyfile(guide, figures / "circuit_guide.png")
+    guide_data = base64.b64encode(guide.read_bytes()).decode("ascii")
+    pictures["circuit_guide.png"] = f'<img alt="circuit_guide.png" src="data:image/png;base64,{guide_data}">'
     cube = explorer_cube(frame, reports, name)
     write_json(STUDY / "explorer_data.json", cube)
     payload = json.dumps(cube, separators=(",", ":"), allow_nan=False).replace("<", "\\u003c")
@@ -337,6 +349,39 @@ The additional control has not inherited the original/selected circuits' input-i
     if version is None:
         raise ValueError("Missing simulator version in the checked evidence")
     caveats = "".join(f"<li>{html.escape(value)}</li>" for value in limitations())
+    layout_table = physical.deadline_summary(layout)
+    layout_geometry = physical.geometry_summary(layout)
+    layout_costs = physical.matched_tt_comparison(layout)
+    layout_section = f"""
+<section id="layout-evidence"><h2>07 / Physical layout: verified geometry, measured limits</h2>
+<p>The same nominal 27-device design now has actual GDS, named-style DRC, independent LVS,
+wrong-net/bulk/width/SVT-LVT negative controls, and separate connectivity/C/RC exports.
+This is a <strong>five-condition, code-zero nominal-geometry addendum</strong>, not a post-layout
+reproduction of the 49-condition schematic width-stress study.</p>
+{pictures["actual_layout.png"]}
+<div class="table-scroll">{layout_geometry.to_html(index=False, float_format=lambda value: f"{value:.4g}", border=0)}</div>
+<p class="muted">The compact predecessor failed M2 pad-notch spacing and was never simulated.
+Four real M2 bridges repair it without changing devices, pins or the other mask geometry.
+Improvement is measured against the prior <em>legal balanced layout</em>, not attributed to
+the bridges alone. Listed capacitance is a sum of emitted elements, not an effective impedance.</p>
+{pictures["layout_costs.png"]}
+<div class="table-scroll">{layout_costs.to_html(index=False, float_format=lambda value: f"{value:.4g}", border=0)}</div>
+<p><strong>The original 1 ns pilot still fails:</strong> RC has 12/20 correct points and
+8 late SS points. At the already recorded <strong>2 ns window</strong>, all 20 sampled RC
+points are correct, with retained 10-to-5 ps comparisons meeting the same numerical limits.
+This is post-hoc characterization, not a relaxed replacement for the original target.</p>
+{pictures["layout_deadlines.png"]}
+<div class="table-scroll">{layout_table.to_html(index=False, border=0)}</div>
+{pictures["layout_waveforms.png"]}
+<p class="muted">Each mode has five conditions times four signed inputs: 20 points, not 80 RC tests.
+The 45-condition nominal PVT extension did not run; 3.5 ns was not evaluated. No silicon,
+density/antenna signoff, mismatch yield or continuous input-range guarantee is implied.
+Six actual RC NPZ traces and their source measurements are included and recomputed in the notebook.</p>
+<p>Actual verification run:
+<a href="{html.escape(layout["receipt"]["run"]["run_url"])}">compact-layout repair evidence</a>.
+The workflow's failure status reflects the preserved 1 ns performance gate,
+not a hidden DRC/LVS failure. Source replay instructions bind the original experimental commit.</p>
+</section>"""
     html_body = f"""<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Comparator Atlas | When calibration is not enough</title>
@@ -375,7 +420,7 @@ label{{display:flex;align-items:center;gap:6px;font-size:13px}}select{{padding:8
 <p>Same supply, common mode, load and decision deadline. A declared nine-candidate search,
 full PVT comparison and input-driver stress study separate genuine progress from a flattering nominal plot.</p>
 <span class="tag">SKY130 / ngspice {html.escape(version.group(1))}</span>
-<span class="tag">Original baseline preserved</span><span class="tag">Research candidate / not submitted</span>
+<span class="tag">Original baseline preserved</span><span class="tag">Code-a-Chip entry / not silicon</span>
 <div class="cards">
 <div class="card"><strong>{100 * baseline_fraction:.1f}% &rarr; {100 * selected_fraction:.1f}%</strong>
 target-band grid coverage<br><small>same local calibration; 1 ns; |input| &ge; 1 mV</small></div>
@@ -396,6 +441,9 @@ the accepted fine-step waveform, including corrections that made the circuit loo
 The original results and failed checks remain published.</p>
 <p>The baseline is our first prototype, not the best published comparator. Established StrongARM,
 auxiliary-pair calibration and low-threshold-device ideas are credited below.</p></div></div></section>
+<section><h2>00 / Understand the actual electrical circuit</h2>{pictures["circuit_guide.png"]}
+<p class="muted">Every D/G/S/B connection and model flavor in this guide is checked against the
+published netlist. Named feedback tags denote the same electrical node. This guide is not a physical layout.</p></section>
 <section><h2>01 / Selection before full validation</h2>{pictures["search.png"]}
 <p class="muted">Selection used TT/1.8 V/27 C, SS/1.62 V/-40 C and FF/1.95 V/125 C,
 six declared input values, and 2x energy / 4x gate-area-proxy budgets. The initial prototype informed the family.
@@ -440,7 +488,8 @@ Codes are frozen before perturbing the interface. The history step changes the e
 evaluation starts at 22.025 ns. Pin error includes deterministic settling and kickback, not random noise.</p>
 <p class="muted">{html.escape(stress["numerical_scope"])} Refinement limits are identical outcomes,
 at most 1% core-energy difference and at most 20 ps resolved-latency difference. These checks are not production signoff.</p></section>
-<section><h2>07 / Reproduce, audit, and reuse</h2>
+{layout_section}
+<section><h2>08 / Reproduce, audit, and reuse</h2>
 <p>Public entry: <code>Comparator_Atlas.ipynb</code>, with Python 3.10 review mode and Colab bootstrap.
 The original complete study notebook remains available locally as
 <code>Comparator_Atlas_Optimized.ipynb</code>. Optional Windows bootstrap:
@@ -452,7 +501,9 @@ Batch execution keeps its actual executed deck and log, not only a schematic scr
 Source and result hashes bind the analysis to the recorded protocol.</p>
 <p>Numerical correction protocol: {html.escape(stress["refinement_policy"])}</p>
 <p>SKY130 primitive revision: <code>{html.escape(manifest["provenance"]["pdk_revision"])}</code>.</p>
-<h3>Limitations and disclosure</h3><ul>{caveats}</ul>
+<h3>Limitations and disclosure</h3>
+<p>The limitations below describe the original schematic design-selection study.
+The physical-layout addendum above has its own narrower nominal-geometry scope.</p><ul>{caveats}</ul>
 <p>Author attribution was supplied by the entrant. AI assistance is disclosed.
 This report does not assert an award, IEEE endorsement, new topology or silicon measurement.
 Publication and upstream PR status are recorded separately.</p>
@@ -479,9 +530,11 @@ and <a href="https://github.com/sscs-ose/sscs-ose-code-a-chip.github.io">current
         "explorer_source_sha256": sha256(javascript_path),
         "professional_control_manifest_sha256": sha256(professional_directory / "manifest.json")
         if professional is not None else None,
+        "layout_receipt_sha256": physical.RECEIPT_SHA256,
+        "layout_review_source_sha256": sha256(physical.ROOT / "layout_evidence.py"),
         "artifact_sha256": {
             "report.html": sha256(path), "explorer_data.json": sha256(STUDY / "explorer_data.json"),
-            **{str(Path("figures") / filename): sha256(figures / filename) for filename in factories},
+            **{str(Path("figures") / filename): sha256(figures / filename) for filename in pictures},
         },
     })
     return path
