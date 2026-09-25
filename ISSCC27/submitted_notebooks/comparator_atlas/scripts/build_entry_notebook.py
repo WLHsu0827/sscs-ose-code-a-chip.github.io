@@ -23,42 +23,33 @@ def main() -> None:
 
         **Wei-Lun Hsu — National Tsing Hua University**
 
-        IEEE SSCS Code-a-Chip, ISSCC 2027 — open-source circuit-design and
-        characterization study. Original project license: MIT.
+        **IEEE SSCS Code-a-Chip — ISSCC 2027**  
+        License: MIT · Tools: SKY130, ngspice, Magic, Netgen and Python
 
         [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sscs-ose/sscs-ose-code-a-chip.github.io/blob/main/ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb)
 
-        **Before upstream merge:**
-        [run the current submitted version in Colab](https://colab.research.google.com/github/WLHsu0827/sscs-ose-code-a-chip.github.io/blob/wlhsu0827-comparator-atlas-isscc27/ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb).
-        The official-owner badge above becomes the canonical link after merge;
-        it is not evidence that this entry has already been accepted.
-        See [the reviewer guide](REVIEWER_GUIDE.md) for a short evaluation path.
+        [Run the submitted version in Colab](https://colab.research.google.com/github/WLHsu0827/sscs-ose-code-a-chip.github.io/blob/wlhsu0827-comparator-atlas-isscc27/ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb)
+        before the official main-branch badge is available.
 
-        **Abstract.** A small switching-boundary offset does not guarantee a
-        valid decision before a deadline. This notebook studies that distinction
-        using unmodified SKY130 device models, a bounded nine-circuit search,
-        a 49-condition original-versus-selected comparison, and a subsequently
-        declared lower-energy control. It distinguishes wrong decisions,
-        unresolved outputs, unavailable calibration, and numerical sensitivity.
-        A separately scoped physical-layout addendum adds actual GDS,
-        DRC/LVS negative controls, distributed RC extraction and a matched
-        comparison against the schematic. Corrected evidence tables,
-        actual waveforms and source hashes make the analysis inspectable.
+        ## Abstract
 
-        **Scope.** The 49-condition design study is schematic-level.
-        The nominal-geometry layout addendum covers five conditions and
-        four signed inputs per mode. These are deterministic simulations,
-        not silicon, foundry yield, a new topology or a global optimum.
-        Energy means the measured core VDD rail, excluding the input/clock
-        drivers and calibration controller. The lower-energy comparison is
-        explicitly post-selection, not a newly blinded benchmark.
+        Offset calibration alone does not ensure that a regenerative comparator
+        makes a correct decision before its deadline. Comparator Atlas explores
+        this tradeoff using a SKY130 StrongARM comparator with physical trim
+        devices. The notebook compares nine sizing/threshold candidates,
+        evaluates calibration policies across PVT conditions, and follows the
+        selected design into actual layout and parasitic extraction. Interactive
+        waveforms connect circuit behavior to decision time and core energy.
+        Schematic and extracted results are compared under explicitly stated
+        conditions, including the slow-corner limitations.
 
-        **Reproduction modes.** Default execution verifies the supplied evidence
-        and recomputes plots and waveform metrics without a circuit simulator.
-        Optional live simulation and the full campaign are separate switches
-        below. Python 3.10 is supported for the organizer's notebook runner.
-        A fresh complete SPICE campaign can take hours; it is not an implicit
-        side effect of opening this notebook.
+        ## Getting started
+
+        Run all cells to verify the supplied data and regenerate the analysis.
+        Set `RUN_LIVE_SPICE` for a small fresh simulation or
+        `RUN_FULL_CAMPAIGN` for the complete schematic study.
+        Tool versions, full commands and evidence locations are in
+        [Reproducibility](REPRODUCIBILITY.md).
         """),
         code(r"""
         from pathlib import Path
@@ -150,7 +141,7 @@ def main() -> None:
         sys.path.insert(0, str(entry_root))
         import matplotlib.pyplot as plt
         import pandas as pd
-        from IPython.display import Code, Image, display
+        from IPython.display import Image, display
         import entry_tools as entry
         import layout_evidence as physical
 
@@ -181,7 +172,7 @@ def main() -> None:
         print("Default: verified supplied evidence, not a fresh SPICE run.")
         """),
         markdown(r"""
-        ## 1. State a falsifiable decision contract
+        ## 1. Decision-time and energy measurements
 
         At deadline $T$ after the evaluation clock midpoint, the decision is
         valid only if **both** complementary outputs reach their assigned
@@ -204,25 +195,20 @@ def main() -> None:
         and each output carries a 5 fF ideal load unless an explicitly named
         interface stress changes that condition.
 
-        Simulator errors, failed reset, missing waveforms, corrupt archives
-        and unavailable calibration are not successful circuit results.
-        All reported fractions refer to a finite declared grid, not yield
-        or an input-probability distribution.
+        Runs are checked for reset and complete waveform data. Pass fractions
+        describe the listed test grid, not manufacturing yield.
         """),
         markdown(r"""
-        ## 2. Calibration must preserve unresolved intervals
+        ## 2. Offset calibration
 
         A zero-input trim scan locates candidates near a sign change. Input
         bisection then brackets confirmed opposite decisions. The score is
 
         $$M_T=\max(|v_-(T)|,\ |v_+(T)|).$$
 
-        The midpoint of a wide unresolved interval is not evidence of a
-        precisely known zero offset. The host search minimizes the larger
-        absolute endpoint among measured candidates, with 0.2 mV input-bracket
-        resolution. This is a documented heuristic around an assumed locally
-        monotonic noiseless transfer, not a new calibration algorithm or proof
-        of a global optimum.
+        A wide unresolved interval is retained rather than replaced by its
+        midpoint. The host search minimizes the larger absolute endpoint,
+        with 0.2 mV input-bracket resolution and a local monotonicity assumption.
 
         The long-deadline policy uses 3.5 ns; a separate ablation applies the
         same procedure at 1 ns. A TT/1.8 V/27 C reference-code policy transfers
@@ -230,7 +216,13 @@ def main() -> None:
         calibration at an unknown fixed process corner.
         """),
         markdown("""
-        ## 3. Physical circuit family and a frozen selection rule
+        ## 3. Comparator circuit and design selection
+
+        During reset, four PFETs precharge the internal and output nodes.
+        When the clock rises, the tail conducts and the input pair starts
+        discharging the internal nodes. Cross-coupled feedback regenerates
+        the differential signal into complementary outputs. Device imbalance
+        shifts the switching boundary; the auxiliary branches provide trim.
 
         The conventional StrongARM core has eleven transistor instances,
         including four reset PFETs. Each trim magnitude bit adds one auxiliary
@@ -277,13 +269,12 @@ def main() -> None:
         display(candidates)
         print("Frozen selected design:", selection["selected_design"])
         display(Image(filename=str(physical.circuit_guide_path())))
-        display(Code(
-            (entry.STUDY / "selected_circuit.spice").read_text(),
-            language="spice",
-        ))
         """),
         markdown("""
-        ## 4. Full comparison and an energy-efficient control
+        ## 4. Schematic results across PVT
+
+        The complete [selected SPICE netlist](results/study/selected_circuit.spice)
+        is provided with the source.
 
         The original comparison has 45 PVT combinations at one controlled
         main-pair width skew, plus four additional nominal skew controls:
@@ -350,7 +341,7 @@ def main() -> None:
         display(minimum_control, deadline_control, interactive_table)
         """),
         markdown("""
-        ## 5. Numerical sensitivity is a result, not a footnote
+        ## 5. Time-step consistency
 
         The original 10-to-5 ps refinement exposed fourteen failed deadline
         checks across seven physical points. Refinement to 0.625 ps produced
@@ -397,7 +388,7 @@ def main() -> None:
         display(numerical)
         """),
         markdown("""
-        ## 6. Recompute metrics from actual transistor-level waveforms
+        ## 6. Waveforms and decision behavior
 
         The following small, hash-checked waveform set is distributed with the
         entry. It is not a synthetic behavioral model. The same measurement
@@ -410,7 +401,10 @@ def main() -> None:
         """),
         code("""
         measured, figure = entry.review_waveforms()
-        display(measured)
+        display(measured[[
+            "design", "input_mv", "deadline_ns", "outcome",
+            "decision_time_ns", "core_energy_fj",
+        ]])
         display(figure)
         plt.close(figure)
         if RUN_LIVE_SPICE:
@@ -424,10 +418,8 @@ def main() -> None:
         markdown("""
         ### Waveform lab: wrong, late, or correct?
 
-        The controls below expose eight post-hoc teaching examples from
-        already recorded SPICE data. The full waveform is rechecked before
-        its excerpt is drawn. This is not a new performance experiment
-        or the full raw-waveform atlas.
+        These controls show eight representative saved SPICE waveforms.
+        Compare the complementary output rails with the selected deadline.
 
         Start with the **code-zero -1 mV schematic example**: its outputs
         resolve to the wrong polarity. Switch to the same circuit and
@@ -450,7 +442,13 @@ def main() -> None:
             figure, reading = waveform_lab.figure(
                 lab, example, deadline_ns
             )
-            display(figure, pd.DataFrame([reading]))
+            display(figure, pd.DataFrame([{
+                key: reading[key] for key in (
+                    "outcome", "deadline_ns", "Q+_at_deadline_V",
+                    "Q-_at_deadline_V", "sampled_decision_time_ns",
+                    "full_cycle_core_energy_fJ",
+                )
+            }]))
             plt.close(figure)
 
 
@@ -481,7 +479,7 @@ def main() -> None:
         display(example_control, waveform_deadline, waveform_output)
         """),
         markdown("""
-        ## 7. The input interface and calibration workload are not free
+        ## 7. Input-interface sensitivity and calibration cost
 
         Five original/selected PVT conditions are stressed with input history,
         finite source resistance and capacitance, altered common mode, and
@@ -507,7 +505,7 @@ def main() -> None:
         display(entry.calibration_workload(evidence))
         """),
         markdown("""
-        ## 8. From schematic to a real extracted layout
+        ## 8. Layout and post-layout results
 
         The layout uses the same selected 27-device circuit with nominally
         matched main inputs and code zero. It does not reproduce the
@@ -539,28 +537,21 @@ def main() -> None:
         plt.close(figure)
         """),
         markdown("""
-        ### Keep the original failure and the measured operating range
+        ### Timing and energy comparison
 
-        The repaired geometry improves the matched TT +/-3 mV RC result
-        from about 0.843 ns / 521 fJ to 0.645 ns / 425 fJ, but still costs
-        substantially more than its matched 244 fJ schematic result.
-        This comparison is against the prior **legal balanced** layout,
-        not the illegal compact predecessor that was never simulated.
-        A bridge-only speed improvement cannot be isolated from this data.
+        At matched TT +/-3 mV points, compact RC routing reduces mean
+        delay from 0.843 to 0.645 ns and core energy from 521 to 425 fJ
+        relative to the prior legal balanced layout. The matched schematic
+        uses 244 fJ. This compares complete layouts, not the isolated effect
+        of the pad repair.
 
-        The original 1 ns pilot remains **not fully qualified**:
-        RC is correct at 12/20 sampled points; eight SS points are late.
-        In the already retained **2 ns window**, RC is correct at 20/20
-        points across five conditions and +/-3, +/-10 mV. This second
-        statement is explicitly post-hoc operating-range characterization,
-        not a revised original gate, continuous-range guarantee or yield.
-        Each mode has 20 points; the four-mode total of 80 is not 80
-        independent RC tests. All retained 10-to-5 ps comparisons at
-        2 ns pass the original numerical limits.
-
-        The 45-condition nominal PVT expansion was not run. A 3.5 ns
-        layout window was not evaluated and is not inferred from 2 ns.
-        The clock remains 10 ns in every comparison.
+        RC meets the original 1 ns deadline at 12/20 sampled points;
+        eight SS points are late. The same retained traces give 20/20
+        correct points at 2 ns. That is a post-hoc observation, not a
+        revised 1 ns pass. Each mode covers five conditions and four
+        inputs (+/-3, +/-10 mV); the 45-condition extracted sweep has
+        not been performed. Numerical comparisons and source records
+        are listed in [Reproducibility](REPRODUCIBILITY.md).
         """),
         code("""
         display(physical.deadline_summary(layout))
@@ -570,52 +561,31 @@ def main() -> None:
         layout_measurements, figure = (
             physical.review_layout_waveforms(layout)
         )
-        display(layout_measurements)
+        display(layout_measurements[[
+            "corner", "vdd_v", "temperature_c", "input_mv",
+            "deadline_ns", "outcome", "decision_time_ns", "core_energy_fj",
+        ]])
         display(figure)
         plt.close(figure)
         """),
         markdown("""
-        ### Reproduce the physical reference
+        ## 9. Discussion and limitations
 
-        `layout_compact_repair` contains the exact native layout,
-        connectivity/C/RC netlists, logs, measurements, numerical
-        comparisons and six original RC waveform examples. Its 108-file
-        local snapshot is explicitly distinguished from the full
-        1,235-file CI payload. The preceding source and failed-layout
-        snapshots remain in `layout_nominal27` and `layout_preflight`.
+        Calibration improves the switching boundary, while device choice
+        and loading affect whether regeneration finishes in time. The
+        lower-energy control and extracted-layout comparison show why
+        accuracy, delay and energy should be evaluated together.
 
-        The historical physical runner binds the original experimental
-        source and branch. To rerun that exact experiment, use the pinned
-        experimental checkout described in README.md, not the updated
-        reviewer notebook checksum as a substitute. The original workflow
-        reports failure at its unchanged 1 ns performance gate while
-        retaining its successful DRC/LVS and all measured results.
-        This is distinct from the fast default notebook review.
-        """),
-        markdown("""
-        ## 9. Reproducibility, attribution and claim boundary
+        - Results are deterministic SKY130 simulations. Width perturbations
+          are controlled stress, not a foundry mismatch distribution or yield.
+        - The 49-condition calibrated schematic study and five-condition
+          nominal, code-zero layout study are separate experiments.
+        - Core-rail energy excludes input/clock drivers and calibration
+          infrastructure. DRC/LVS do not establish silicon performance or
+          complete foundry signoff.
 
-        `entry_tools.load_evidence()` checks source, protocol, selection and
-        result hashes; recomputes the explicit numerical corrections; and
-        rejects missing, duplicated or incorrectly represented observations.
-        Archived Windows-style manifest keys are resolved portably without
-        disabling source verification. Git attributes preserve the bytes
-        of hash-bound source and data files across platforms.
-
-        The default review path runs with Python 3.10 and no SPICE installation.
-        The optional live path uses the unmodified pinned SKY130 models and
-        an installed ngspice. Full reproduction is available through the
-        source CLI and the explicit full-campaign switch; runtime, tool
-        versions and the distinction from saved results are documented.
-
-        **Supported:** deterministic schematic behavior and the separately
-        scoped nominal-layout observations; a bounded design-space
-        comparison; measured core-rail energy; an inspectable workflow.
-
-        **Not supported:** a new topology, global optimum, fabrication-ready
-        signoff, silicon performance, yield, noise-error probability, total
-        system power, or superiority over unmatched published circuits.
-        No "IEEE certification" or award is implied.
+        See [Reproducibility](REPRODUCIBILITY.md) for tool versions, commands,
+        numerical criteria and the locations of layouts, waveforms and logs.
 
         ### References
 
@@ -639,12 +609,10 @@ def main() -> None:
            [distributed resistance extraction](https://opencircuitdesign.com/magic/commandref/extresist.html),
            and [open_pdks](https://github.com/RTimothyEdwards/open_pdks).
 
-        **AI-assistance disclosure.** GitHub Copilot assisted code, experiment
-        automation and documentation. Wei-Lun Hsu is responsible for reviewing,
-        explaining and defending the submitted work. This assistance is not
-        an assertion that a particular publication or award policy has been
-        waived. Original code and prose are MIT licensed; third-party models
-        and tools retain their own licenses.
+        **Acknowledgment.** GitHub Copilot assisted implementation, experiment
+        automation, figures and documentation. The author is responsible for
+        the work. Original code is MIT licensed; third-party models and tools
+        retain their licenses.
         """),
     ]
     notebook = nbf.v4.new_notebook(cells=cells)

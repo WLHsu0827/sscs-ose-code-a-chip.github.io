@@ -1,6 +1,6 @@
 {
   "status": "competition_guide_generated_from_checked_evidence",
-  "source_sha256": "87012a3318a559af587b3257830547e12e289cfb3c5baa6da4eee006df893cad",
+  "source_sha256": "ece1dcbd374bd9304f63a635c2b026e39ba5a137bd4e42dd081075606a5c8624",
   "facts": {
     "authors": [
       {
@@ -62,14 +62,14 @@
       "A submitted PR is not acceptance, a rank or an award."
     ],
     "evidence_sha256": {
-      "entry_metadata.json": "cf9f9fafa55680e153dedf6a392d02bcd057bc59e96d5a1e2045a6271fe94ed5",
+      "entry_metadata.json": "22587e50b84c33ffa8d9d24ec9da0f865a1ad2602326ae05fad7d89597523b69",
       "results/study/selection.json": "c0baa56712d07e537c8c0789d42532d545e6ecfc46b09ff563ef5884968c83f0",
       "results/study/verified_measurements.csv": "6b645926fc80e105020d44b7f5ba56b7bb551acad80602b633de025b7c81d722",
       "results/study/professional/measurements.csv": "b1e238cd6600a8b2c6423daa89ed06539506191da388c6b47af50f645e156eed",
       "layout_compact_repair/verification-receipt.json": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490"
     }
   },
-  "guide_sha256": "c41393b8ef50cc56751f2655289ae57439bad591e35fa6e5fd4bbfecec7eb0e8",
+  "guide_sha256": "51e3d64eb004f6c93a54d697e1ca39fc900cfbd94b195f2cfec6a088cbac54e9",
   "new_physical_simulations": 0,
   "public_upload_performed": false
 }

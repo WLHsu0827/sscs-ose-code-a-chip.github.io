@@ -21,7 +21,7 @@ from .stress import (
     verified_comparison as comparison,
 )
 from .study import (
-    CACHE, POLICIES, STUDY, checked_manifest, limitations,
+    CACHE, POLICIES, STUDY, checked_manifest,
 )
 
 POLICY_LABELS = {
@@ -268,7 +268,7 @@ def render_study() -> Path:
     frame, reports, manifest = load_validation()
     layout = physical.load_layout()
     waveform_data = waveform_lab.load_lab()
-    numerical, operating, stress = load_stress()
+    _, operating, stress = load_stress()
     optimization = checked_manifest("optimization_manifest.json")
     selection = json.loads((STUDY / "selection.json").read_text())
     name = selection["selected_design"]
@@ -320,15 +320,8 @@ def render_study() -> Path:
     waveform_javascript_path = STUDY.parents[1] / "presentation" / "waveform_explorer.mjs"
     waveform_javascript = waveform_javascript_path.read_text(encoding="utf-8")
     waveform_payload = json.dumps(waveform_data, separators=(",", ":"), allow_nan=False).replace("<", "\\u003c")
-    numerical_status = "PASS" if stress["numerical_passed"] else "REQUIRES REVIEW"
-    warnings = sum(len(receipt["warnings"]) for receipt in (optimization, manifest, stress))
-    total_runs = len(set(optimization["run_ids"]) | set(manifest["run_ids"]) | set(stress["run_ids"]))
     professional_section = ""
     if professional is not None:
-        total_runs = len(
-            set(optimization["run_ids"]) | set(manifest["run_ids"]) | set(stress["run_ids"])
-            | set(professional["control"]["run_ids"])
-        )
         target_band = entry_tools.summary(professional, minimum_mv=1)
         wide_band = entry_tools.summary(professional, minimum_mv=3)
         professional_section = f"""
@@ -353,12 +346,11 @@ The additional control has not inherited the original/selected circuits' input-i
     version = re.search(r"\bngspice-(\S+)", manifest["provenance"]["ngspice_version"])
     if version is None:
         raise ValueError("Missing simulator version in the checked evidence")
-    caveats = "".join(f"<li>{html.escape(value)}</li>" for value in limitations())
     layout_table = physical.deadline_summary(layout)
     layout_geometry = physical.geometry_summary(layout)
     layout_costs = physical.matched_tt_comparison(layout)
     layout_section = f"""
-<section id="layout-evidence"><h2>07 / Physical layout: verified geometry, measured limits</h2>
+<section id="layout-evidence"><h2>07 / Layout and extracted-circuit results</h2>
 <p>The same nominal 27-device design now has actual GDS, named-style DRC, independent LVS,
 wrong-net/bulk/width/SVT-LVT negative controls, and separate connectivity/C/RC exports.
 This is a <strong>five-condition, code-zero nominal-geometry addendum</strong>, not a post-layout
@@ -437,30 +429,26 @@ label{{display:flex;align-items:center;gap:6px;font-size:13px}}select{{padding:8
 <header><small>REPRODUCIBLE ANALOG DESIGN / IEEE SSCS CODE-A-CHIP CANDIDATE</small>
 <h1>Comparator Atlas</h1><p style="font-size:23px;margin:0 0 8px">When calibration is not enough.</p>
 <p><strong>{html.escape(author["name"])}</strong> &mdash; {html.escape(author["affiliation"])}</p>
-<p>Same supply, common mode, load and decision deadline. A declared nine-candidate search,
-full PVT comparison and input-driver stress study separate genuine progress from a flattering nominal plot.</p>
+<p>A SKY130 comparator study from sizing and calibration to layout and parasitic extraction:
+compare decision accuracy, delay and energy under the same stated conditions.</p>
 <span class="tag">SKY130 / ngspice {html.escape(version.group(1))}</span>
-<span class="tag">Original baseline preserved</span><span class="tag">Code-a-Chip entry / not silicon</span>
+<span class="tag">Schematic and extracted results</span><span class="tag">Open-source notebook</span>
 <div class="cards">
 <div class="card"><strong>{100 * baseline_fraction:.1f}% &rarr; {100 * selected_fraction:.1f}%</strong>
 target-band grid coverage<br><small>same local calibration; 1 ns; |input| &ge; 1 mV</small></div>
 <div class="card"><strong>49 &times; {len(manifest["designs"])}</strong>declared operating cases<br><small>45-point PVT grid + four stress controls per design</small></div>
-<div class="card"><strong>{total_runs:,}</strong>distinct physical SPICE runs<br><small>search, validation and robustness evidence</small></div>
+<div class="card"><strong>{get_design(name).transistor_count}</strong>transistor instances<br><small>selected core with physical trim branches</small></div>
 <div class="card"><strong>{energy["relative_change_percent"]:+.1f}%</strong>mean core-energy change<br><small>{energy["matched_points"]} matched points; not total chip energy</small></div>
 </div></header><main>
-<section class="notice"><h2>The improvement has a price and a scope</h2>
+<section class="notice"><h2>Design tradeoffs</h2>
 <div class="split"><div><p>Selected circuit: <code>{html.escape(name)}</code>.</p>
 <p>The transistor gate-area proxy is <span class="metric">{energy["gate_area_ratio"]:.2f}x</span> the original.
 Matched mean core-rail energy is <strong>{energy["baseline_fj"]:.2f} &rarr; {energy["selected_fj"]:.2f} fJ/cycle</strong>.
 This is not a claim of lower area, lower system power, silicon yield or a new comparator topology.</p></div>
-<div><p>Numerical refinement: <strong>{numerical_status}</strong> across {len(numerical):,} deadline checks.
-Simulator warning-bearing runs across phase receipts: {warnings}.</p>
-<p>The first 10-to-5 ps pass exposed <strong>{stress["initial_numerical_failures"]} failing checks</strong>.
-{stress["refined_physical_points"]} physical points were refined further; all matching policy rows now use
-the accepted fine-step waveform, including corrections that made the circuit look worse.
-The original results and failed checks remain published.</p>
-<p>The baseline is our first prototype, not the best published comparator. Established StrongARM,
-auxiliary-pair calibration and low-threshold-device ideas are credited below.</p></div></div></section>
+<div><p>The comparison uses the same local calibration policy, input band and deadline.
+A lower-energy candidate is included to show the accuracy-energy tradeoff.</p>
+<p>The PVT comparison is schematic-level. The physical-layout section separately reports
+nominal code-zero measurements and the remaining slow-corner limitation.</p></div></div></section>
 <section><h2>00 / Understand the actual electrical circuit</h2>{pictures["circuit_guide.png"]}
 <p class="muted">Every D/G/S/B connection and model flavor in this guide is checked against the
 published netlist. Named feedback tags denote the same electrical node. This guide is not a physical layout.</p></section>
@@ -526,7 +514,7 @@ Changing the deadline reads the same trace; it does not run SPICE or alter a cir
 <p class="muted">Core energy is measured over the entire 10 ns cycle and does not shrink when the display deadline moves.
 Cursor voltages use the original waveform samples; latency is a sampled measurement, not an exact crossing.
 For layout examples, the original 1 ns pilot remains failed even when an individual trace resolves by 2 ns.</p>
-<p id="waveform-source"></p></section>
+<details><summary>Source record</summary><p id="waveform-source"></p></details></section>
 <section><h2>04 / Timing and resolution are coupled</h2>{pictures["policies.png"]}{pictures["guardbands.png"]}
 <p class="muted">The hardware comparison uses the same local 3.5 ns calibration policy.
 The 1 ns policy is a separate ablation: it minimizes the finite-deadline decision interval rather than
@@ -541,24 +529,20 @@ evaluation starts at 22.025 ns. Pin error includes deterministic settling and ki
 <p class="muted">{html.escape(stress["numerical_scope"])} Refinement limits are identical outcomes,
 at most 1% core-energy difference and at most 20 ps resolved-latency difference. These checks are not production signoff.</p></section>
 {layout_section}
-<section><h2>08 / Reproduce, audit, and reuse</h2>
+<section><h2>08 / Reproduction and references</h2>
 <p>Public entry: <code>Comparator_Atlas.ipynb</code>, with Python 3.10 review mode and Colab bootstrap.
-The original complete study notebook remains available locally as
-<code>Comparator_Atlas_Optimized.ipynb</code>. Optional Windows bootstrap:
+Optional Windows bootstrap:
 <code>node scripts\\setup.mjs</code>. Then run the CLI stages
 <code>optimize</code>, <code>study</code>, <code>stress</code> and <code>report</code>
 with the project Python and <code>-m comparator_atlas</code>.</p>
-<p>Every physical run is keyed by its reproduction deck, initialization, model contents and executable.
-Batch execution keeps its actual executed deck and log, not only a schematic screenshot.
-Source and result hashes bind the analysis to the recorded protocol.</p>
-<p>Numerical correction protocol: {html.escape(stress["refinement_policy"])}</p>
-<p>SKY130 primitive revision: <code>{html.escape(manifest["provenance"]["pdk_revision"])}</code>.</p>
-<h3>Limitations and disclosure</h3>
-<p>The limitations below describe the original schematic design-selection study.
-The physical-layout addendum above has its own narrower nominal-geometry scope.</p><ul>{caveats}</ul>
-<p>Author attribution was supplied by the entrant. AI assistance is disclosed.
-This report does not assert an award, IEEE endorsement, new topology or silicon measurement.
-Publication and upstream PR status are recorded separately.</p>
+<p>Full commands, tool versions and source-data locations are in
+<a href="../../REPRODUCIBILITY.md">REPRODUCIBILITY.md</a>.
+Saved outputs are checked against their source records before analysis.</p>
+<h3>Scope</h3>
+<p>These are deterministic simulations. Controlled width perturbations are not a foundry
+mismatch distribution or yield. Core energy excludes external drivers and calibration infrastructure.
+The calibrated schematic and nominal-layout experiments have separate condition sets;
+DRC/LVS do not establish silicon performance or complete foundry signoff.</p>
 <h3>Established ideas and related work</h3>
 <ul>
 <li>B. Razavi, <a href="https://doi.org/10.1109/MSSC.2015.2418155">The StrongARM Latch</a>, 2015.</li>
@@ -569,7 +553,9 @@ and <a href="https://github.com/edonD/sky130-comparator">an existing SKY130/LVT 
 Their code, figures, performance claims and statistical assumptions are not reused as this study's evidence.</li>
 <li><a href="https://github.com/google/skywater-pdk-libs-sky130_fd_pr">Official SKY130 primitive models</a>
 and <a href="https://github.com/sscs-ose/sscs-ose-code-a-chip.github.io">current competition rules</a>.</li>
-</ul></section></main>
+</ul><p class="muted">GitHub Copilot assisted implementation, experiment automation, figures
+and documentation. Original code is MIT licensed; model and tool licenses are retained.</p>
+</section></main>
 <script id="atlas-cube" type="application/json">{payload}</script>
 <script id="waveform-lab-data" type="application/json">{waveform_payload}</script>
 <script type="module">{javascript}</script>

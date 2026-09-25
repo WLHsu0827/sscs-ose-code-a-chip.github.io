@@ -172,7 +172,7 @@ def build() -> Path:
                 fontsize=12, color=muted)
     figure.text(0.035, 0.019,
                 "Original code: MIT. SKY130 keeps Apache-2.0. GitHub Copilot assistance disclosed. "
-                "No new topology, yield, IEEE endorsement or award claim.",
+                "Source, models and reproduction instructions are linked in the notebook.",
                 fontsize=12, color=muted)
 
     pdf, preview = OUTPUT / "Comparator_Atlas_Poster.pdf", OUTPUT / "poster_preview.png"

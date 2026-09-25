@@ -1,7 +1,7 @@
 {
   "status": "current_competition_materials_from_verified_evidence",
-  "generator_sha256": "3e5cc2ec4530d9cb461bca5f9b17c4595c015a86a95545d2c33c6ecb580fc54e",
-  "release_facts_source_sha256": "87012a3318a559af587b3257830547e12e289cfb3c5baa6da4eee006df893cad",
+  "generator_sha256": "5d023f6acf5b98377eeae459c162245d5ac21bf3438442db63f71b3b65884baa",
+  "release_facts_source_sha256": "ece1dcbd374bd9304f63a635c2b026e39ba5a137bd4e42dd081075606a5c8624",
   "facts": {
     "authors": [
       {
@@ -63,7 +63,7 @@
       "A submitted PR is not acceptance, a rank or an award."
     ],
     "evidence_sha256": {
-      "entry_metadata.json": "cf9f9fafa55680e153dedf6a392d02bcd057bc59e96d5a1e2045a6271fe94ed5",
+      "entry_metadata.json": "22587e50b84c33ffa8d9d24ec9da0f865a1ad2602326ae05fad7d89597523b69",
       "results/study/selection.json": "c0baa56712d07e537c8c0789d42532d545e6ecfc46b09ff563ef5884968c83f0",
       "results/study/verified_measurements.csv": "6b645926fc80e105020d44b7f5ba56b7bb551acad80602b633de025b7c81d722",
       "results/study/professional/measurements.csv": "b1e238cd6600a8b2c6423daa89ed06539506191da388c6b47af50f645e156eed",
@@ -71,7 +71,7 @@
     }
   },
   "data_evidence_sha256": {
-    "entry_metadata.json": "cf9f9fafa55680e153dedf6a392d02bcd057bc59e96d5a1e2045a6271fe94ed5",
+    "entry_metadata.json": "22587e50b84c33ffa8d9d24ec9da0f865a1ad2602326ae05fad7d89597523b69",
     "results/study/selection.json": "c0baa56712d07e537c8c0789d42532d545e6ecfc46b09ff563ef5884968c83f0",
     "results/study/verified_measurements.csv": "6b645926fc80e105020d44b7f5ba56b7bb551acad80602b633de025b7c81d722",
     "results/study/professional/measurements.csv": "b1e238cd6600a8b2c6423daa89ed06539506191da388c6b47af50f645e156eed",
@@ -81,11 +81,11 @@
   "stress_manifest_sha256": "cab8ac38a1e268b471b4e53399199842be0eca2e75ac2b69da8effe8ce1022d6",
   "layout_receipt_sha256": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490",
   "artifact_sha256": {
-    "Comparator_Atlas_Poster.pdf": "6e31077101f4c89a70f59204107fd7611fdb6fd9de7cf8e5873560f55656a4ab",
-    "poster_preview.png": "97e5dc4b790aba9d3144c312136bb0b3402bbd66b4a5e484d5cf300624a16158",
+    "Comparator_Atlas_Poster.pdf": "f1454bf8e68264e73f1b589660e4bbb42ffd645e86d6562ca2e9cb2ea30fab7d",
+    "poster_preview.png": "fd312a29b6c13e7794d9823087fa998a52d7a1842bd45e93974c63c84b6fc527",
     "abstract.txt": "1b23408b0300a64c020ced963b726f6893944bc29b6821ef5b6ac2a8bfe7d74a"
   },
-  "reviewer_guide_sha256": "c41393b8ef50cc56751f2655289ae57439bad591e35fa6e5fd4bbfecec7eb0e8",
+  "reviewer_guide_sha256": "51e3d64eb004f6c93a54d697e1ca39fc900cfbd94b195f2cfec6a088cbac54e9",
   "public_upload_performed": false,
   "new_physical_experiments": 0
 }
