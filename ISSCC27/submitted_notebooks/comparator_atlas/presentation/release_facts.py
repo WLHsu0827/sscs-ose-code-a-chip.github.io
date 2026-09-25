@@ -8,6 +8,7 @@ from pathlib import Path
 
 import entry_tools as entry
 import layout_evidence as physical
+from presentation import pvt45_results
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = "ISSCC27/submitted_notebooks/comparator_atlas"
@@ -23,6 +24,8 @@ TREE_URL = f"https://github.com/{FORK}/tree/{BRANCH}/{PREFIX}"
 def load_facts() -> dict:
     schematic = entry.load_evidence()
     layout = physical.load_layout()
+    pvt45 = pvt45_results.load_results()
+    full_table = pvt45_results.comparison_table(pvt45["frame"]).set_index("implementation")
     metadata = schematic["metadata"]
     narrow = entry.summary(schematic, minimum_mv=1.0)
     wide = entry.summary(schematic, minimum_mv=3.0)
@@ -79,6 +82,30 @@ def load_facts() -> dict:
             "physical_run_url": layout["receipt"]["run"]["run_url"],
             "physical_run_conclusion": "failure_at_original_1ns_performance_gate",
         },
+        "postlayout_pvt45": {
+            "conditions": 45,
+            "points_per_mode": 180,
+            "primary_deadline_ns": 2,
+            "parallel_deadline_ns": 1,
+            "rc_correct_1ns": int(full_table.loc["Extracted RC", "correct_at_1ns"]),
+            "rc_correct_2ns": int(full_table.loc["Extracted RC", "correct_at_2ns"]),
+            "rc_unresolved_1ns": 24,
+            "mean_schematic_energy_fj": float(full_table.loc["Schematic", "mean_core_energy_fj"]),
+            "mean_rc_energy_fj": float(full_table.loc["Extracted RC", "mean_core_energy_fj"]),
+            "worst_rc_delay_ns": float(full_table.loc["Extracted RC", "worst_delay_ns_at_2ns"]),
+            "worst_rc_condition": pvt45["summary"]["matched_statistics"]["observed_worst_point"],
+            "mean_per_point_energy_overhead_percent":
+                pvt45["summary"]["matched_statistics"]["mean_per_point_energy_overhead_percent"],
+            "nominal_geometry": True,
+            "trim_code": 0,
+            "simulator": "ngspice-47",
+            "actual_transients": 720,
+            "all_360_numerical_histories_qualified": True,
+            "previously_observed_conditions": 5,
+            "new_postlayout_conditions": 40,
+            "blinded_external_test": False,
+            "old_five_condition_1ns_gate_reinterpreted": False,
+        },
         "limits": [
             "Schematic 49-condition results and nominal-layout five-condition results are separate experiments.",
             "Twenty RC points are not eighty independent RC tests or full 45-condition extracted coverage.",
@@ -95,12 +122,17 @@ def load_facts() -> dict:
                 entry.STUDY / "professional" / "measurements.csv"
             ),
             "layout_compact_repair/verification-receipt.json": physical.RECEIPT_SHA256,
+            **{
+                f"results/study/postlayout_pvt45/{name}": expected
+                for name, expected in pvt45_results.REFERENCE_FILES.items()
+            },
         },
     }
 
 
 def readme_text(facts: dict, design_table: str) -> str:
     layout = facts["layout"]
+    full = facts["postlayout_pvt45"]
     return f"""# Comparator Atlas: When Calibration Is Not Enough
 
 **Wei-Lun Hsu — National Tsing Hua University**  
@@ -133,19 +165,28 @@ These are finite-grid results: 45 PVT combinations at controlled width
 stress plus four nominal controls. The lower-energy candidate was evaluated
 after the original selection.
 
-The separate nominal-layout study uses code zero, five PVT conditions and
-four signed inputs per condition. DRC/LVS and device/connection controls pass.
-RC gives **{layout["rc_correct_1ns"]}/{layout["rc_sampled_points"]} correct
-points at the original 1 ns deadline** and
-**{layout["rc_correct_posthoc_2ns"]}/{layout["rc_sampled_points"]} at the retained
-2 ns window**. The latter is post-hoc characterization; the original
-1 ns pilot is not fully qualified.
+The physical implementation passes the recorded DRC/LVS and negative controls.
+Its full nominal, code-zero study covers **45 PVT conditions and four signed
+inputs per condition**. Schematic and extracted RC were simulated under the
+same ngspice-47 settings and checked at 10/5 ps.
 
-Against the earlier legal balanced layout, matched TT +/-3 mV mean RC
-delay improves from {layout["previous_legal_rc_delay_ns"]:.3f} to
-{layout["repaired_rc_delay_ns"]:.3f} ns, and core energy from
-{layout["previous_legal_rc_energy_fj"]:.1f} to
-{layout["repaired_rc_energy_fj"]:.1f} fJ/cycle.
+| Nominal full-grid result | Schematic | Extracted RC |
+| --- | ---: | ---: |
+| Correct at 1 ns | 180/180 | {full["rc_correct_1ns"]}/180 |
+| Correct at the declared 2 ns deadline | 180/180 | {full["rc_correct_2ns"]}/180 |
+| Mean core energy (fJ/cycle) | {full["mean_schematic_energy_fj"]:.2f} | {full["mean_rc_energy_fj"]:.2f} |
+
+The slowest RC sample is **{full["worst_rc_delay_ns"]:.3f} ns at FS / 1.62 V /
+-40 C / -3 mV**. The 24 remaining 1 ns points are unresolved, not wrong.
+The earlier five-condition ngspice-42 layout pilot remains a separate record:
+12/20 RC points met its original 1 ns target; 20/20 met a retained 2 ns window.
+The full-grid 2 ns criterion was declared separately rather than rewriting that
+pilot's result.
+
+![Full post-layout PVT timing](results/study/postlayout_pvt45/figures/pvt45_timing.png)
+
+Each cell is the maximum over four signed inputs. Black outlines mark
+conditions with a missed 1 ns sample. [Vector PDF](results/study/postlayout_pvt45/figures/pvt45_timing.pdf).
 
 ## Run
 
@@ -176,8 +217,9 @@ examples with a deadline cursor and complementary-rail thresholds.
 
 ## Scope
 
-The calibrated schematic and nominal-layout experiments have different
-scopes; extracted 45-condition PVT coverage has not been established.
+The calibrated schematic and nominal-layout experiments have different scopes.
+Full-grid layout inputs are limited to -10, -3, +3 and +10 mV at code zero;
+five conditions had been observed previously, and this is not a blinded test.
 Core energy excludes external drivers and calibration infrastructure.
 The results are deterministic simulations, not silicon measurements or
 foundry statistical yield. References and detailed conditions are in the
@@ -194,6 +236,7 @@ documentation; the author is responsible for the work.
 
 def write_judge_guide(facts: dict) -> Path:
     schematic, layout = facts["schematic"], facts["layout"]
+    full = facts["postlayout_pvt45"]
     text = f"""# Comparator Atlas - quick tour
 
 **Wei-Lun Hsu - National Tsing Hua University**
@@ -215,10 +258,12 @@ def write_judge_guide(facts: dict) -> Path:
    no design is declared best for every specification.
 3. **Inspect actual layout evidence.** View the hash-checked GDS, DRC/LVS
    negative controls and matched schematic/connectivity/C/RC results.
-   Original 1 ns RC is {layout["rc_correct_1ns"]}/{layout["rc_sampled_points"]};
-   the retained post-hoc 2 ns window is
-   {layout["rc_correct_posthoc_2ns"]}/{layout["rc_sampled_points"]}.
-   Both the success scope and the missed original target stay visible.
+   The full 45-condition nominal RC study gives
+   {full["rc_correct_1ns"]}/{full["points_per_mode"]} correct at 1 ns and
+   {full["rc_correct_2ns"]}/{full["points_per_mode"]} at its declared 2 ns
+   deadline. Its worst sample is {full["worst_rc_delay_ns"]:.3f} ns at
+   FS / 1.62 V / -40 C / -3 mV. The earlier five-condition pilot is retained
+   separately and is not retrospectively relabeled.
 
 The **Waveform lab** makes the distinction concrete: eight representative
 saved examples have a movable deadline, complementary output thresholds and

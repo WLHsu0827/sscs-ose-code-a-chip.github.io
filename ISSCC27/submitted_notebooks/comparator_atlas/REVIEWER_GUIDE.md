@@ -19,10 +19,12 @@
    no design is declared best for every specification.
 3. **Inspect actual layout evidence.** View the hash-checked GDS, DRC/LVS
    negative controls and matched schematic/connectivity/C/RC results.
-   Original 1 ns RC is 12/20;
-   the retained post-hoc 2 ns window is
-   20/20.
-   Both the success scope and the missed original target stay visible.
+   The full 45-condition nominal RC study gives
+   156/180 correct at 1 ns and
+   180/180 at its declared 2 ns
+   deadline. Its worst sample is 1.835 ns at
+   FS / 1.62 V / -40 C / -3 mV. The earlier five-condition pilot is retained
+   separately and is not retrospectively relabeled.
 
 The **Waveform lab** makes the distinction concrete: eight representative
 saved examples have a movable deadline, complementary output thresholds and

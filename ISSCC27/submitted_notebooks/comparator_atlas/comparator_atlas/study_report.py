@@ -263,10 +263,12 @@ def paired_energy(frame: pd.DataFrame, selected_name: str) -> dict:
 
 def render_study() -> Path:
     import layout_evidence as physical
-    from presentation import waveform_lab
+    from presentation import pvt45_results, waveform_lab
 
     frame, reports, manifest = load_validation()
     layout = physical.load_layout()
+    full_pvt = pvt45_results.load_results()
+    pvt45_results.review_examples(full_pvt)
     waveform_data = waveform_lab.load_lab()
     _, operating, stress = load_stress()
     optimization = checked_manifest("optimization_manifest.json")
@@ -298,6 +300,9 @@ def render_study() -> Path:
         "layout_deadlines.png": lambda: physical.deadline_figure(layout),
         "layout_costs.png": lambda: physical.tt_cost_figure(layout),
         "layout_waveforms.png": lambda: physical.review_layout_waveforms(layout)[1],
+        "pvt45_timing.png": lambda: pvt45_results.timing_figure(full_pvt["frame"]),
+        "pvt45_comparison.png": lambda: pvt45_results.tradeoff_figure(full_pvt["frame"]),
+        "pvt45_worst_waveform.png": lambda: pvt45_results.worst_case_figure(full_pvt),
     }
     if professional is not None:
         factories["efficient_control.png"] = lambda: entry_tools.tradeoff_figure(professional)
@@ -353,8 +358,9 @@ The additional control has not inherited the original/selected circuits' input-i
 <section id="layout-evidence"><h2>07 / Layout and extracted-circuit results</h2>
 <p>The same nominal 27-device design now has actual GDS, named-style DRC, independent LVS,
 wrong-net/bulk/width/SVT-LVT negative controls, and separate connectivity/C/RC exports.
-This is a <strong>five-condition, code-zero nominal-geometry addendum</strong>, not a post-layout
-reproduction of the 49-condition schematic width-stress study.</p>
+The original layout development used <strong>five code-zero conditions</strong>.
+The following expanded study covers 45 PVT conditions with the same nominal geometry.
+Neither is a post-layout reproduction of the calibrated width-stress study.</p>
 {pictures["actual_layout.png"]}
 <div class="table-scroll">{layout_geometry.to_html(index=False, float_format=lambda value: f"{value:.4g}", border=0)}</div>
 <p class="muted">The compact predecessor failed M2 pad-notch spacing and was never simulated.
@@ -363,6 +369,7 @@ Improvement is measured against the prior <em>legal balanced layout</em>, not at
 the bridges alone. Listed capacitance is a sum of emitted elements, not an effective impedance.</p>
 {pictures["layout_costs.png"]}
 <div class="table-scroll">{layout_costs.to_html(index=False, float_format=lambda value: f"{value:.4g}", border=0)}</div>
+<h3>Earlier five-condition layout pilot (ngspice 42)</h3>
 <p><strong>The original 1 ns pilot still fails:</strong> RC has 12/20 correct points and
 8 late SS points. At the already recorded <strong>2 ns window</strong>, all 20 sampled RC
 points are correct, with retained 10-to-5 ps comparisons meeting the same numerical limits.
@@ -370,14 +377,42 @@ This is post-hoc characterization, not a relaxed replacement for the original ta
 {pictures["layout_deadlines.png"]}
 <div class="table-scroll">{layout_table.to_html(index=False, border=0)}</div>
 {pictures["layout_waveforms.png"]}
-<p class="muted">Each mode has five conditions times four signed inputs: 20 points, not 80 RC tests.
-The 45-condition nominal PVT extension did not run; 3.5 ns was not evaluated. No silicon,
-density/antenna signoff, mismatch yield or continuous input-range guarantee is implied.
-Six actual RC NPZ traces and their source measurements are included and recomputed in the notebook.</p>
+<p class="muted">Each mode in this earlier pilot has five conditions times four inputs:
+20 points, not 80 RC tests. Its original gated 45-condition extension did not run; 3.5 ns
+was not evaluated. These records remain separate from the new full-grid study below.</p>
 <p>Actual verification run:
 <a href="{html.escape(layout["receipt"]["run"]["run_url"])}">compact-layout repair evidence</a>.
 The workflow's failure status reflects the preserved 1 ns performance gate,
 not a hidden DRC/LVS failure. Source replay instructions bind the original experimental commit.</p>
+</section>"""
+    pvt_table = pvt45_results.comparison_table(full_pvt["frame"])
+    pvt_section = f"""
+<section id="pvt45-evidence"><h2>08 / Full-grid post-layout verification</h2>
+<p>The repaired nominal, code-zero schematic and RC circuits were evaluated at
+five process corners, three supplies and three temperatures: <strong>45 conditions,
+four signed inputs each, 180 points per mode</strong>. The primary 2 ns deadline
+was declared before this expanded study; 1 ns is reported alongside it.</p>
+<p><strong>Extracted RC: 180/180 correct at 2 ns; 156/180 at 1 ns.</strong>
+The other 24 points are late, with no wrong decisions. All point histories
+meet the same numerical criteria at 10 and 5 ps.</p>
+{pictures["pvt45_timing.png"]}
+<p class="muted">Each cell is the maximum sampled delay over -10, -3, +3 and +10 mV.
+Black outlines mark a missed 1 ns sample. Five conditions had been observed in the
+earlier pilot; forty are new post-layout conditions, not a blinded external test.</p>
+<div class="table-scroll">{pvt_table.to_html(index=False, float_format=lambda value: f"{value:.4g}", border=0)}</div>
+{pictures["pvt45_comparison.png"]}
+<p>The slowest sampled RC point is <strong>FS / 1.62 V / -40 C / -3 mV:
+1.835 ns</strong>. Mean core energy is 245.84 fJ schematic versus 425.49 fJ RC.
+The mean per-point overhead is 73.45%; the ratio of population means is 73.08%.</p>
+{pictures["pvt45_worst_waveform.png"]}
+<p class="muted">Both modes in this study use ngspice 47, the same pinned SKY130 models,
+nominal dimensions, code zero, 5 fF output loads, 0.5 VDD common mode and a 10 ns clock
+with 50 ps edges. This is a finite sampled result, not a noise, mismatch-yield or
+continuous-input guarantee. It does not retroactively change the earlier 1 ns pilot.</p>
+<p>Publication-size vector figures:
+<a href="postlayout_pvt45/figures/pvt45_timing.pdf">PVT timing</a>,
+<a href="postlayout_pvt45/figures/pvt45_comparison.pdf">paired comparison</a>,
+<a href="postlayout_pvt45/figures/pvt45_worst_waveform.pdf">worst-case waveform</a>.</p>
 </section>"""
     html_body = f"""<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -529,7 +564,8 @@ evaluation starts at 22.025 ns. Pin error includes deterministic settling and ki
 <p class="muted">{html.escape(stress["numerical_scope"])} Refinement limits are identical outcomes,
 at most 1% core-energy difference and at most 20 ps resolved-latency difference. These checks are not production signoff.</p></section>
 {layout_section}
-<section><h2>08 / Reproduction and references</h2>
+{pvt_section}
+<section><h2>09 / Reproduction and references</h2>
 <p>Public entry: <code>Comparator_Atlas.ipynb</code>, with Python 3.10 review mode and Colab bootstrap.
 Optional Windows bootstrap:
 <code>node scripts\\setup.mjs</code>. Then run the CLI stages
@@ -575,6 +611,8 @@ and documentation. Original code is MIT licensed; model and tool licenses are re
         "waveform_lab_data_sha256": sha256(waveform_lab.FOLDER / "waveform_lab.json"),
         "waveform_lab_manifest_sha256": sha256(waveform_lab.FOLDER / "manifest.json"),
         "waveform_ui_source_sha256": sha256(waveform_javascript_path),
+        "full_pvt45_input_sha256": pvt45_results.REFERENCE_FILES,
+        "full_pvt45_plot_source_sha256": sha256(Path(pvt45_results.__file__)),
         "artifact_sha256": {
             "report.html": sha256(path), "explorer_data.json": sha256(STUDY / "explorer_data.json"),
             **{str(Path("figures") / filename): sha256(figures / filename) for filename in pictures},

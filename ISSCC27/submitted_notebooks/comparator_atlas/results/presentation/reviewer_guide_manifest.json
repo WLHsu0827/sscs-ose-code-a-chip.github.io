@@ -1,6 +1,6 @@
 {
   "status": "competition_guide_generated_from_checked_evidence",
-  "source_sha256": "ece1dcbd374bd9304f63a635c2b026e39ba5a137bd4e42dd081075606a5c8624",
+  "source_sha256": "1fc1b91d91ba8367f3a2e8444978bd7b4b84d7bbf093bfd13520e2d2a6deec4c",
   "facts": {
     "authors": [
       {
@@ -53,6 +53,34 @@
       "physical_run_url": "https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/actions/runs/35945064081",
       "physical_run_conclusion": "failure_at_original_1ns_performance_gate"
     },
+    "postlayout_pvt45": {
+      "conditions": 45,
+      "points_per_mode": 180,
+      "primary_deadline_ns": 2,
+      "parallel_deadline_ns": 1,
+      "rc_correct_1ns": 156,
+      "rc_correct_2ns": 180,
+      "rc_unresolved_1ns": 24,
+      "mean_schematic_energy_fj": 245.8351613176448,
+      "mean_rc_energy_fj": 425.4900542141249,
+      "worst_rc_delay_ns": 1.8350324672430904,
+      "worst_rc_condition": {
+        "corner": "fs",
+        "vdd_v": 1.62,
+        "temperature_c": -40,
+        "differential_mv": -3
+      },
+      "mean_per_point_energy_overhead_percent": 73.45452737269308,
+      "nominal_geometry": true,
+      "trim_code": 0,
+      "simulator": "ngspice-47",
+      "actual_transients": 720,
+      "all_360_numerical_histories_qualified": true,
+      "previously_observed_conditions": 5,
+      "new_postlayout_conditions": 40,
+      "blinded_external_test": false,
+      "old_five_condition_1ns_gate_reinterpreted": false
+    },
     "limits": [
       "Schematic 49-condition results and nominal-layout five-condition results are separate experiments.",
       "Twenty RC points are not eighty independent RC tests or full 45-condition extracted coverage.",
@@ -62,14 +90,18 @@
       "A submitted PR is not acceptance, a rank or an award."
     ],
     "evidence_sha256": {
-      "entry_metadata.json": "22587e50b84c33ffa8d9d24ec9da0f865a1ad2602326ae05fad7d89597523b69",
+      "entry_metadata.json": "3af798fadec4eb7c88ff76e464e4783465a9da0190fb7a6b2cdcfda0229f9226",
       "results/study/selection.json": "c0baa56712d07e537c8c0789d42532d545e6ecfc46b09ff563ef5884968c83f0",
       "results/study/verified_measurements.csv": "6b645926fc80e105020d44b7f5ba56b7bb551acad80602b633de025b7c81d722",
       "results/study/professional/measurements.csv": "b1e238cd6600a8b2c6423daa89ed06539506191da388c6b47af50f645e156eed",
-      "layout_compact_repair/verification-receipt.json": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490"
+      "layout_compact_repair/verification-receipt.json": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490",
+      "results/study/postlayout_pvt45/measurements.csv": "0710979ebc65c955a8d7071e5704e51a34ef9c03993ebe9138c7461d6856d9ca",
+      "results/study/postlayout_pvt45/source-summary.json": "757f211e115c5cee2aeb1565c4b4bec9a5c64cce4d080f2b10c19e33123d89a7",
+      "results/study/postlayout_pvt45/independent-audit.json": "5f1c3b7284d990a4e1296a0662e0a195e5f27a5987bcb10b3b5b01d911840a39",
+      "results/study/postlayout_pvt45/condition-table.csv": "a10d93b84973780a558c36222f0a9d9388a63828c5069fc46996d4cb8705faec"
     }
   },
-  "guide_sha256": "51e3d64eb004f6c93a54d697e1ca39fc900cfbd94b195f2cfec6a088cbac54e9",
+  "guide_sha256": "540cdd1725534a1e34af60981ce1f832d5cb452bbd5853c95ab463b5ea82940e",
   "new_physical_simulations": 0,
   "public_upload_performed": false
 }

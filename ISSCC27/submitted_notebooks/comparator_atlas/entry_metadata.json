@@ -34,5 +34,26 @@
     "full_45_condition_pex_performed": false,
     "full_rc_payload_files": 1235,
     "published_representative_snapshot_files": 108
+  },
+  "postlayout_pvt45": {
+    "conditions": 45,
+    "input_values_mv": [-10, -3, 3, 10],
+    "points_per_mode": 180,
+    "modes": ["schematic", "rc"],
+    "nominal_geometry_code_zero": true,
+    "primary_deadline_ns": 2,
+    "parallel_deadline_ns": 1,
+    "rc_correct_at_2ns": 180,
+    "rc_correct_at_1ns": 156,
+    "rc_unresolved_at_1ns": 24,
+    "worst_sampled_rc_delay_ns": 1.8350324672430902,
+    "worst_sampled_rc_condition": ["fs", 1.62, -40, -3],
+    "ngspice": "47",
+    "actual_original_transients": 720,
+    "all_360_point_histories_numerically_confirmed": true,
+    "previously_observed_conditions": 5,
+    "new_postlayout_conditions": 40,
+    "blinded_external_test": false,
+    "original_five_condition_pilot_status_rewritten": false
   }
 }

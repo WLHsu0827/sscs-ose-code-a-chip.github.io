@@ -2,7 +2,7 @@
   "status": "complete",
   "validation_manifest_sha256": "84466bdfc4b9051db25f7ddf87d9cd28c3c66efc0b1b5775b8e198127b4a55ef",
   "stress_manifest_sha256": "cab8ac38a1e268b471b4e53399199842be0eca2e75ac2b69da8effe8ce1022d6",
-  "report_source_sha256": "1d54ca0fcd2c7d4e691953032441f8091219bc9344c6a837f31f0efaf1d5fb67",
+  "report_source_sha256": "4a1962ae486d1fbfc22a6ae8e97b40cebbad3211b2133b567d48b6bb7839e062",
   "explorer_source_sha256": "39345e584ffd167aeb4f9e2ea9311a4c67bee410d62f16c22ce8812f21e192cb",
   "professional_control_manifest_sha256": "f75fa251f8f41e98d675a40a1d14b7d73687e8cfd6f12c1f57339673768245cb",
   "layout_receipt_sha256": "ca6042d02ae0d315caf9b5f8e1f7db0a0fdb29f5115fcb7832473a9dd488d490",
@@ -10,8 +10,15 @@
   "waveform_lab_data_sha256": "bdba7c2217b744a77812fd45a708d8c557a540a24fd57f97e9ed58e732e1c407",
   "waveform_lab_manifest_sha256": "cd4335572b7e2f3851436be045f5120e68ea07bb6db1c04d2ce6b4ad9ffa975c",
   "waveform_ui_source_sha256": "dc2c9f8559d0a1a72df77686fd9d6c06b7bf8aeb51cbe6c60f47cf3278f37675",
+  "full_pvt45_input_sha256": {
+    "measurements.csv": "0710979ebc65c955a8d7071e5704e51a34ef9c03993ebe9138c7461d6856d9ca",
+    "source-summary.json": "757f211e115c5cee2aeb1565c4b4bec9a5c64cce4d080f2b10c19e33123d89a7",
+    "independent-audit.json": "5f1c3b7284d990a4e1296a0662e0a195e5f27a5987bcb10b3b5b01d911840a39",
+    "condition-table.csv": "a10d93b84973780a558c36222f0a9d9388a63828c5069fc46996d4cb8705faec"
+  },
+  "full_pvt45_plot_source_sha256": "08268d27c82ef9b7cbcc8b20e7c6110981555f9d80a6aa2a1654ae255d4b2bab",
   "artifact_sha256": {
-    "report.html": "3868e8b7534bdf9e5f938275a9e45dd856e03ec1cf53d2ec1c52bc143c9bd065",
+    "report.html": "ba8ee18e3aad210cef5add7ad11c3631a8120265770791fafba5569f46fc35d2",
     "explorer_data.json": "3f7a3961ce5487d8d758397b58244519f97453d4cbf0c3571d364bea3de6f145",
     "figures\\search.png": "85ef07796f2d1b46fab08eed50bb6b2ba82388aca9c88fabb8aaa7e7dbd5fee7",
     "figures\\pvt.png": "2368a2ff95de2b774e619de52f6cd5c7d07f672a58453505ad86152e2e1596d2",
@@ -23,6 +30,9 @@
     "figures\\layout_deadlines.png": "6ac0ac65a408e04050717726112c0aaa191738e78f064a43ab702cd1edc5639e",
     "figures\\layout_costs.png": "264dbf577da307e50f49308e428f2a00eb37848c100f360e2da0f7cca8dc5947",
     "figures\\layout_waveforms.png": "65b58f3e4a62983acafef1af168da5a4592374d7599dee45728e715e1f981e9d",
+    "figures\\pvt45_timing.png": "0f860ba7f9dd8965b9dd1411a76653287f43552e4632803536fb575493cef6c9",
+    "figures\\pvt45_comparison.png": "49a9144c554cfa4aa17555ee9ff345b5f950de71ea0742030abd8c308422e7fe",
+    "figures\\pvt45_worst_waveform.png": "46c71274420618ea8795158e8e5f4d491689650553894d718554ff3febc0119b",
     "figures\\efficient_control.png": "195a845ed6831bbeb96e605161b1fb2237c8e2a0287670b61baa7bb74860135a",
     "figures\\circuit_guide.png": "85251526de98190bee17c78288e2051c7ad9075d5a06f91efa56d00853a33976"
   }

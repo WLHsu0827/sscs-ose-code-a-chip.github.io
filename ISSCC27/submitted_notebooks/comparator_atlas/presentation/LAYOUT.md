@@ -13,7 +13,7 @@ widths and SVT/LVT substitutions. The distributed-RC export has 675
 resistors and 319 listed capacitors; counts and sums are not effective
 network impedances.
 
-## Timing
+## Original five-condition pilot
 
 | Reporting window | Schematic | Connectivity only | C-only | RC |
 | --- | ---: | ---: | ---: | ---: |
@@ -24,7 +24,30 @@ The eight late RC points occur at the two SS conditions. Each mode has
 20 sampled points; the table does not represent 80 independent RC tests.
 The original 1 ns pilot is not fully qualified. The 2 ns result describes
 the same retained waveforms, not a revised original target.
-The 45-condition extracted sweep has not been performed.
+The originally gated 45-condition extension did not run as part of this
+ngspice-42 pilot. The later study below uses a separately declared protocol.
+
+## Full 45-condition post-layout study
+
+The same repaired RC netlist and matched schematic were evaluated using
+ngspice 47 at TT, SS, FF, SF and FS; 1.62, 1.80 and 1.95 V; and -40, 27
+and 125 C. The four inputs remain -10, -3, +3 and +10 mV at each condition.
+
+| Mode | Correct at 1 ns | Correct at the declared 2 ns deadline | Mean core energy (fJ) |
+| --- | ---: | ---: | ---: |
+| Schematic | 180/180 | 180/180 | 245.84 |
+| Extracted RC | 156/180 | 180/180 | 425.49 |
+
+All 360 pointwise 10/5 ps numerical histories qualify under the fixed
+measurement tolerances. The slowest sampled RC decision is 1.835 ns at
+FS / 1.62 V / -40 C / -3 mV. The 24 missed 1 ns points are unresolved,
+not wrong-sign decisions. This is a new prospective 2 ns test, not a
+retroactive passing interpretation of the earlier 1 ns pilot.
+
+Five conditions had been observed previously; the other forty are new
+post-layout conditions, not a blinded benchmark. The actual GDS and
+extracted network are unchanged, and DRC/LVS are inherited from the
+physical run rather than claimed as newly executed.
 
 ## Layout comparison
 
@@ -45,6 +68,8 @@ they do not isolate the bridges' contribution.
 - [C-only netlist](../layout_compact_repair/evidence/attempt1/atlas.c.spice)
 - [Distributed-RC netlist](../layout_compact_repair/evidence/attempt1/atlas.rc.spice)
 - [Measurements](../layout_compact_repair/evidence/attempt1/matched-metrics.csv)
+- [Full-grid measurements](../results/study/postlayout_pvt45/measurements.csv)
+- [Full-grid vector timing map](../results/study/postlayout_pvt45/figures/pvt45_timing.pdf)
 - [Reproduction instructions and tool versions](../REPRODUCIBILITY.md)
 
 These are nominal-geometry simulations, separate from the schematic

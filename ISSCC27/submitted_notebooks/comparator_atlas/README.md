@@ -34,19 +34,28 @@ These are finite-grid results: 45 PVT combinations at controlled width
 stress plus four nominal controls. The lower-energy candidate was evaluated
 after the original selection.
 
-The separate nominal-layout study uses code zero, five PVT conditions and
-four signed inputs per condition. DRC/LVS and device/connection controls pass.
-RC gives **12/20 correct
-points at the original 1 ns deadline** and
-**20/20 at the retained
-2 ns window**. The latter is post-hoc characterization; the original
-1 ns pilot is not fully qualified.
+The physical implementation passes the recorded DRC/LVS and negative controls.
+Its full nominal, code-zero study covers **45 PVT conditions and four signed
+inputs per condition**. Schematic and extracted RC were simulated under the
+same ngspice-47 settings and checked at 10/5 ps.
 
-Against the earlier legal balanced layout, matched TT +/-3 mV mean RC
-delay improves from 0.843 to
-0.645 ns, and core energy from
-520.8 to
-425.4 fJ/cycle.
+| Nominal full-grid result | Schematic | Extracted RC |
+| --- | ---: | ---: |
+| Correct at 1 ns | 180/180 | 156/180 |
+| Correct at the declared 2 ns deadline | 180/180 | 180/180 |
+| Mean core energy (fJ/cycle) | 245.84 | 425.49 |
+
+The slowest RC sample is **1.835 ns at FS / 1.62 V /
+-40 C / -3 mV**. The 24 remaining 1 ns points are unresolved, not wrong.
+The earlier five-condition ngspice-42 layout pilot remains a separate record:
+12/20 RC points met its original 1 ns target; 20/20 met a retained 2 ns window.
+The full-grid 2 ns criterion was declared separately rather than rewriting that
+pilot's result.
+
+![Full post-layout PVT timing](results/study/postlayout_pvt45/figures/pvt45_timing.png)
+
+Each cell is the maximum over four signed inputs. Black outlines mark
+conditions with a missed 1 ns sample. [Vector PDF](results/study/postlayout_pvt45/figures/pvt45_timing.pdf).
 
 ## Run
 
@@ -77,8 +86,9 @@ examples with a deadline cursor and complementary-rail thresholds.
 
 ## Scope
 
-The calibrated schematic and nominal-layout experiments have different
-scopes; extracted 45-condition PVT coverage has not been established.
+The calibrated schematic and nominal-layout experiments have different scopes.
+Full-grid layout inputs are limited to -10, -3, +3 and +10 mV at code zero;
+five conditions had been observed previously, and this is not a blinded test.
 Core energy excludes external drivers and calibration infrastructure.
 The results are deterministic simulations, not silicon measurements or
 foundry statistical yield. References and detailed conditions are in the

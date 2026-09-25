@@ -1,7 +1,7 @@
 {
   "status": "passed",
-  "report_sha256": "3868e8b7534bdf9e5f938275a9e45dd856e03ec1cf53d2ec1c52bc143c9bd065",
-  "browser": "Edg/153.0.4234.48",
+  "report_sha256": "ba8ee18e3aad210cef5add7ad11c3631a8120265770791fafba5569f46fc35d2",
+  "browser": "Edg/154.0.4258.37",
   "fixture": false,
   "views": [
     {
@@ -29,7 +29,7 @@
       "visibleRows": 49
     }
   ],
-  "imageCount": 12,
+  "imageCount": 15,
   "cellInspection": "lvt_balanced_4b | TT | 1.62 V | -40 C | skew +4% | input -30 mV | deadline 1 ns | Correct | trim -2 | decision time 0.2476 ns | core energy 165.201 fJ.",
   "cases": 49,
   "decisions": 30576,
@@ -38,7 +38,14 @@
     "images": 4,
     "original1nsFailureDisclosed": true,
     "posthoc2nsScopeDisclosed": true,
-    "noFull45PvtClaim": true
+    "earlierPilotNotRelabeledAsFullGrid": true
+  },
+  "pvt45": {
+    "pointsPerMode": 180,
+    "RCcorrect2ns": 180,
+    "RCcorrect1ns": 156,
+    "figures": 3,
+    "originalFiveConditionPilotRetained": true
   },
   "waveformLab": {
     "samples": 8,
@@ -57,6 +64,7 @@
     "report-desktop.png",
     "report-explorer.png",
     "report-layout.png",
+    "report-pvt45.png",
     "report-waveform-lab.png",
     "report-mobile.png",
     "report-waveform-mobile.png",

@@ -41,7 +41,9 @@ def main() -> None:
         selected design into actual layout and parasitic extraction. Interactive
         waveforms connect circuit behavior to decision time and core energy.
         Schematic and extracted results are compared under explicitly stated
-        conditions, including the slow-corner limitations.
+        conditions. A 45-condition nominal extracted-RC study reaches the
+        declared 2 ns deadline at all 180 sampled inputs, with a measured
+        worst-case decision time of 1.835 ns.
 
         ## Getting started
 
@@ -537,7 +539,7 @@ def main() -> None:
         plt.close(figure)
         """),
         markdown("""
-        ### Timing and energy comparison
+        ### Earlier five-condition layout comparison
 
         At matched TT +/-3 mV points, compact RC routing reduces mean
         delay from 0.843 to 0.645 ns and core energy from 521 to 425 fJ
@@ -548,10 +550,9 @@ def main() -> None:
         RC meets the original 1 ns deadline at 12/20 sampled points;
         eight SS points are late. The same retained traces give 20/20
         correct points at 2 ns. That is a post-hoc observation, not a
-        revised 1 ns pass. Each mode covers five conditions and four
-        inputs (+/-3, +/-10 mV); the 45-condition extracted sweep has
-        not been performed. Numerical comparisons and source records
-        are listed in [Reproducibility](REPRODUCIBILITY.md).
+        revised 1 ns pass. This earlier ngspice-42 study covers five
+        conditions and four inputs (+/-3, +/-10 mV) per mode. Its results
+        remain separate from the following ngspice-47 full-grid study.
         """),
         code("""
         display(physical.deadline_summary(layout))
@@ -569,6 +570,72 @@ def main() -> None:
         plt.close(figure)
         """),
         markdown("""
+        ### Full-grid post-layout verification
+
+        The same nominal 27-device layout is now evaluated over all five
+        process corners, three supplies (1.62, 1.80, 1.95 V), and three
+        temperatures (-40, 27, 125 C). Each of the 45 conditions uses
+        differential inputs -10, -3, +3 and +10 mV: **180 points per mode**.
+        Schematic and extracted RC use code zero, common mode 0.5 VDD,
+        5 fF output loads, and the same 10 ns clock with 50 ps edges.
+
+        This new study declares **2 ns** as its primary deadline while also
+        reporting 1 ns. Both modes were freshly simulated with ngspice 47
+        at 10 and 5 ps; all 360 pointwise numerical comparisons meet the
+        fixed decision, 1% energy and 20 ps latency criteria. The five
+        earlier layout conditions are identified as previously observed;
+        the other forty are new post-layout conditions, not a blinded test.
+
+        **RC is correct at 180/180 sampled points at 2 ns, and 156/180 at
+        1 ns.** The 24 remaining 1 ns points are unresolved, not wrong-sign
+        decisions. The slowest sample is FS / 1.62 V / -40 C / -3 mV at
+        1.835 ns, rather than the SS corner seen in the earlier pilot.
+        These finite-grid results do not establish statistical yield or
+        behavior between the listed input values.
+        """),
+        code("""
+        from presentation import pvt45_results as pvt
+
+        full_pvt = pvt.load_results()
+        display(pvt.comparison_table(full_pvt["frame"]))
+        figure = pvt.timing_figure(full_pvt["frame"])
+        display(figure)
+        plt.close(figure)
+        figure = pvt.tradeoff_figure(full_pvt["frame"])
+        display(figure)
+        plt.close(figure)
+        """),
+        markdown("""
+        The PVT map shows the **maximum over the four signed input samples**
+        in each cell. Black outlines identify conditions containing a missed
+        1 ns decision; every point meets the primary 2 ns deadline.
+        The paired plots retain all 180 schematic/RC comparisons, with
+        marker shape as well as color identifying the process corner.
+
+        Mean full-grid core energy is **245.84 fJ schematic versus
+        425.49 fJ extracted RC**. The mean of the per-point energy overheads
+        is 73.45%; the ratio of population means is 73.08%. These are
+        different aggregations and are not interchanged.
+
+        [Vector PVT map](results/study/postlayout_pvt45/figures/pvt45_timing.pdf)
+        · [Vector paired comparison](results/study/postlayout_pvt45/figures/pvt45_comparison.pdf)
+
+        The next plot remeasures the original saved schematic/RC pair at
+        the worst sampled condition. Ten representative traces are provided
+        for review; they are a subset of the 720 simulations behind the
+        complete result.
+        """),
+        code("""
+        pvt_examples = pvt.review_examples(full_pvt)
+        display(pvt_examples[[
+            "condition", "mode", "input_mv", "deadline_ns",
+            "outcome", "decision_time_ns", "core_energy_fj",
+        ]])
+        figure = pvt.worst_case_figure(full_pvt)
+        display(figure)
+        plt.close(figure)
+        """),
+        markdown("""
         ## 9. Discussion and limitations
 
         Calibration improves the switching boundary, while device choice
@@ -578,8 +645,9 @@ def main() -> None:
 
         - Results are deterministic SKY130 simulations. Width perturbations
           are controlled stress, not a foundry mismatch distribution or yield.
-        - The 49-condition calibrated schematic study and five-condition
-          nominal, code-zero layout study are separate experiments.
+        - The 49-condition calibrated schematic study, earlier five-condition
+          layout experiment and full 45-condition nominal code-zero study
+          have separate conditions and recorded tool identities.
         - Core-rail energy excludes input/clock drivers and calibration
           infrastructure. DRC/LVS do not establish silicon performance or
           complete foundry signoff.
