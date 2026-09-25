@@ -249,6 +249,13 @@ def main() -> None:
         is the sum of transistor W times L, not placed/routed area.
         The first prototype informed the family. All rejected candidates
         remain visible in the recorded selection.
+
+        The schematic uses enhancement-mode MOS symbols and explicitly
+        connected regenerative feedback. A reset symbol represents one
+        device for each listed node; the trim pair repeats for bits 0–3
+        on both sides. Identical node labels in different panels connect
+        electrically. Body ties are stated beneath the drawing.
+        [Vector schematic](results/presentation/circuit_guide.pdf).
         """),
         code("""
         if RUN_FULL_CAMPAIGN:

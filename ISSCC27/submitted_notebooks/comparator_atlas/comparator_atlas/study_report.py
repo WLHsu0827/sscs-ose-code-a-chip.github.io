@@ -485,8 +485,11 @@ A lower-energy candidate is included to show the accuracy-energy tradeoff.</p>
 <p>The PVT comparison is schematic-level. The physical-layout section separately reports
 nominal code-zero measurements and the remaining slow-corner limitation.</p></div></div></section>
 <section><h2>00 / Understand the actual electrical circuit</h2>{pictures["circuit_guide.png"]}
-<p class="muted">Every D/G/S/B connection and model flavor in this guide is checked against the
-published netlist. Named feedback tags denote the same electrical node. This guide is not a physical layout.</p></section>
+<p class="muted">The source-checked MOS schematic shows the cross-coupled core, a reset PFET
+repeated at the four listed nodes, and one trim bit repeated on both sides for k = 0–3.
+Filled dots are electrical junctions; unmarked crossings are unconnected. Matching node labels
+across panels denote the same net. All 27 instances, device flavors and body ties are retained.
+<a href="../presentation/circuit_guide.pdf">Vector PDF schematic</a>.</p></section>
 <section><h2>01 / Selection before full validation</h2>{pictures["search.png"]}
 <p class="muted">Selection used TT/1.8 V/27 C, SS/1.62 V/-40 C and FF/1.95 V/125 C,
 six declared input values, and 2x energy / 4x gate-area-proxy budgets. The initial prototype informed the family.
