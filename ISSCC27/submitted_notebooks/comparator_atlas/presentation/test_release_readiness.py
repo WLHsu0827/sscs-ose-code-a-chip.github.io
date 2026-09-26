@@ -1,4 +1,6 @@
 import ast
+import hashlib
+import json
 from pathlib import Path
 import textwrap
 
@@ -69,3 +71,47 @@ def test_final_presentation_facts_keep_schematic_and_layout_scopes_separate():
     assert facts["layout"]["rc_sampled_points"] == 20
     assert facts["layout"]["original_1ns_pilot_qualified"] is False
     assert facts["layout"]["posthoc_2ns_is_new_qualification"] is False
+
+
+def test_pilot_limit_does_not_deny_the_subsequent_completed_full_grid():
+    facts = load_facts()
+    pilot, full = facts["layout"], facts["postlayout_pvt45"]
+    assert pilot["scope"] == "original_five_condition_pilot"
+    assert pilot["simulator"] == "ngspice-42"
+    assert pilot["condition_count"] == 5
+    assert pilot["pilot_full_45_condition_extracted_sweep_performed"] is False
+    assert "full_45_condition_pex_performed" not in pilot
+    assert full["scope"] == "subsequent_separately_declared_full_grid_study"
+    assert full["simulator"] == "ngspice-47"
+    assert full["full_45_condition_extracted_sweep_performed"] is True
+    assert (full["conditions"], full["points_per_mode"]) == (45, 180)
+    assert (full["primary_deadline_ns"], full["parallel_deadline_ns"]) == (2, 1)
+    assert (full["rc_correct_2ns"], full["rc_correct_1ns"]) == (180, 156)
+    assert full["old_five_condition_1ns_gate_reinterpreted"] is False
+    limits = " ".join(facts["limits"])
+    assert "that pilot did not perform a full 45-condition extracted sweep" in limits
+    assert "ngspice-47 study completed 45 conditions and 180 RC points" in limits
+    assert "Only the original ngspice-42 pilot's 2 ns result is post-hoc" in limits
+    assert "prospectively declared 2 ns primary deadline" in limits
+
+
+def test_published_fact_consumers_match_current_scoped_evidence():
+    root = Path(__file__).resolve().parents[1]
+    facts = load_facts()
+    metadata = json.loads((root / "entry_metadata.json").read_bytes())
+    pilot, full = metadata["layout_addendum"], metadata["postlayout_pvt45"]
+    assert pilot["scope"] == facts["layout"]["scope"]
+    assert pilot["simulator"] == facts["layout"]["simulator"]
+    assert pilot["pilot_full_45_condition_extracted_sweep_performed"] is False
+    assert "full_45_condition_pex_performed" not in pilot
+    assert full["scope"] == facts["postlayout_pvt45"]["scope"]
+    assert full["full_45_condition_extracted_sweep_performed"] is True
+    assert (full["rc_correct_at_2ns"], full["rc_correct_at_1ns"]) == (180, 156)
+    source_hash = hashlib.sha256((root / "presentation" / "release_facts.py").read_bytes()).hexdigest()
+    for relative, source_key in (
+        ("results/presentation/reviewer_guide_manifest.json", "source_sha256"),
+        ("results/study/poster_manifest.json", "release_facts_source_sha256"),
+    ):
+        manifest = json.loads((root / relative).read_bytes())
+        assert manifest["facts"] == facts
+        assert manifest[source_key] == source_hash

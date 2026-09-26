@@ -59,6 +59,8 @@ def load_facts() -> dict:
             "efficient_control_energy_fj": float(narrow.loc["lvt_base_3b", "mean_core_energy_fj"]),
         },
         "layout": {
+            "scope": "original_five_condition_pilot",
+            "simulator": "ngspice-42",
             "nominal_geometry": True,
             "trim_code": 0,
             "condition_count": len(layout["receipt"]["protocol"]["sampled_conditions"]),
@@ -77,12 +79,14 @@ def load_facts() -> dict:
             "delay_reduction_percent": float(100 * (1 - repaired.mean_delay_ns / old.mean_delay_ns)),
             "energy_reduction_percent": float(100 * (1 - repaired.mean_core_energy_fj / old.mean_core_energy_fj)),
             "original_1ns_pilot_qualified": False,
-            "full_45_condition_pex_performed": False,
+            "pilot_full_45_condition_extracted_sweep_performed": False,
             "posthoc_2ns_is_new_qualification": False,
             "physical_run_url": layout["receipt"]["run"]["run_url"],
             "physical_run_conclusion": "failure_at_original_1ns_performance_gate",
         },
         "postlayout_pvt45": {
+            "scope": "subsequent_separately_declared_full_grid_study",
+            "full_45_condition_extracted_sweep_performed": True,
             "conditions": 45,
             "points_per_mode": 180,
             "primary_deadline_ns": 2,
@@ -107,9 +111,14 @@ def load_facts() -> dict:
             "old_five_condition_1ns_gate_reinterpreted": False,
         },
         "limits": [
-            "Schematic 49-condition results and nominal-layout five-condition results are separate experiments.",
-            "Twenty RC points are not eighty independent RC tests or full 45-condition extracted coverage.",
-            "The 2 ns statement is post-hoc characterization; the original 1 ns pilot remains failed.",
+            "The calibrated schematic 49-condition study, original ngspice-42 five-condition pilot, "
+            "and subsequent ngspice-47 full-grid study are separate experiments.",
+            "The original ngspice-42 pilot has twenty RC points, not eighty independent RC tests; "
+            "that pilot did not perform a full 45-condition extracted sweep. The subsequent separately "
+            "declared ngspice-47 study completed 45 conditions and 180 RC points.",
+            "Only the original ngspice-42 pilot's 2 ns result is post-hoc; its 1 ns gate remains failed. "
+            "The subsequent ngspice-47 study has a prospectively declared 2 ns primary deadline "
+            "(180/180 RC correct), with parallel 1 ns results (156/180 RC correct).",
             "Core energy excludes external drivers and calibration infrastructure.",
             "No silicon measurement, foundry signoff, yield, continuous-input guarantee or global optimum is claimed.",
             "A submitted PR is not acceptance, a rank or an award.",

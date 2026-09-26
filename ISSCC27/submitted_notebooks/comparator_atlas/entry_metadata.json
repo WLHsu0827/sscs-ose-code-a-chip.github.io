@@ -21,6 +21,8 @@
     "global_design_optimum": false
   },
   "layout_addendum": {
+    "scope": "original_five_condition_pilot",
+    "simulator": "ngspice-42",
     "source_commit": "68832ec0ae7c526afcb4cded405a0bfd753a65c3",
     "run_url": "https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/actions/runs/35945064081",
     "actual_drc_and_lvs_pass": true,
@@ -31,11 +33,13 @@
     "original_1ns_rc_unresolved": 8,
     "original_1ns_pilot_qualified": false,
     "retained_posthoc_2ns_rc_correct": 20,
-    "full_45_condition_pex_performed": false,
+    "pilot_full_45_condition_extracted_sweep_performed": false,
     "full_rc_payload_files": 1235,
     "published_representative_snapshot_files": 108
   },
   "postlayout_pvt45": {
+    "scope": "subsequent_separately_declared_full_grid_study",
+    "full_45_condition_extracted_sweep_performed": true,
     "conditions": 45,
     "input_values_mv": [-10, -3, 3, 10],
     "points_per_mode": 180,

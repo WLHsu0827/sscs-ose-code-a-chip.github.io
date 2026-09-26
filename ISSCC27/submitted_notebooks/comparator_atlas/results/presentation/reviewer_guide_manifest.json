@@ -1,6 +1,6 @@
 {
   "status": "competition_guide_generated_from_checked_evidence",
-  "source_sha256": "1fc1b91d91ba8367f3a2e8444978bd7b4b84d7bbf093bfd13520e2d2a6deec4c",
+  "source_sha256": "4700525e0b6c474196d1f6ef8a0c0191b8bbbe8829989f914f044ba9f212a298",
   "facts": {
     "authors": [
       {
@@ -30,6 +30,8 @@
       "efficient_control_energy_fj": 156.64685554651538
     },
     "layout": {
+      "scope": "original_five_condition_pilot",
+      "simulator": "ngspice-42",
       "nominal_geometry": true,
       "trim_code": 0,
       "condition_count": 5,
@@ -48,12 +50,14 @@
       "delay_reduction_percent": 23.463257181926334,
       "energy_reduction_percent": 18.332179872573107,
       "original_1ns_pilot_qualified": false,
-      "full_45_condition_pex_performed": false,
+      "pilot_full_45_condition_extracted_sweep_performed": false,
       "posthoc_2ns_is_new_qualification": false,
       "physical_run_url": "https://github.com/WLHsu0827/sscs-ose-code-a-chip.github.io/actions/runs/35945064081",
       "physical_run_conclusion": "failure_at_original_1ns_performance_gate"
     },
     "postlayout_pvt45": {
+      "scope": "subsequent_separately_declared_full_grid_study",
+      "full_45_condition_extracted_sweep_performed": true,
       "conditions": 45,
       "points_per_mode": 180,
       "primary_deadline_ns": 2,
@@ -82,15 +86,15 @@
       "old_five_condition_1ns_gate_reinterpreted": false
     },
     "limits": [
-      "Schematic 49-condition results and nominal-layout five-condition results are separate experiments.",
-      "Twenty RC points are not eighty independent RC tests or full 45-condition extracted coverage.",
-      "The 2 ns statement is post-hoc characterization; the original 1 ns pilot remains failed.",
+      "The calibrated schematic 49-condition study, original ngspice-42 five-condition pilot, and subsequent ngspice-47 full-grid study are separate experiments.",
+      "The original ngspice-42 pilot has twenty RC points, not eighty independent RC tests; that pilot did not perform a full 45-condition extracted sweep. The subsequent separately declared ngspice-47 study completed 45 conditions and 180 RC points.",
+      "Only the original ngspice-42 pilot's 2 ns result is post-hoc; its 1 ns gate remains failed. The subsequent ngspice-47 study has a prospectively declared 2 ns primary deadline (180/180 RC correct), with parallel 1 ns results (156/180 RC correct).",
       "Core energy excludes external drivers and calibration infrastructure.",
       "No silicon measurement, foundry signoff, yield, continuous-input guarantee or global optimum is claimed.",
       "A submitted PR is not acceptance, a rank or an award."
     ],
     "evidence_sha256": {
-      "entry_metadata.json": "3af798fadec4eb7c88ff76e464e4783465a9da0190fb7a6b2cdcfda0229f9226",
+      "entry_metadata.json": "8716081b651c4208628aa3a6783f951084b1775431c942a8f75b6832add17c03",
       "results/study/selection.json": "c0baa56712d07e537c8c0789d42532d545e6ecfc46b09ff563ef5884968c83f0",
       "results/study/verified_measurements.csv": "6b645926fc80e105020d44b7f5ba56b7bb551acad80602b633de025b7c81d722",
       "results/study/professional/measurements.csv": "b1e238cd6600a8b2c6423daa89ed06539506191da388c6b47af50f645e156eed",
