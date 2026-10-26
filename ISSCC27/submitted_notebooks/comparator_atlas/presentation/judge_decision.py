@@ -70,7 +70,8 @@ EXTENSION_SUMMARY = (
     "Widening the input pair to 1.75× (r26d) gives 999/1000 for 3.2% more (not statistically resolved); "
     "the trim's PVT gain ratio (~1.5) is set by its topology, and the remaining miss follows a binary "
     "carry law, step sd = √(σ0² + (2^j − 1)σu²) with σu ≈ 0.1 mV per unit cell, which predicts that "
-    "thermometer-coded MSBs would remove it.")
+    "thermometer-coded MSBs would remove it. Simulated with three thermometer MSBs (r26e, ideal decoder), "
+    "the trim passes 1000/1000 at the same energy and its steps above 2 mV fall 3.3× (3.6× predicted).")
 
 
 def sha(path):

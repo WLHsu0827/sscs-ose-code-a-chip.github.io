@@ -1451,6 +1451,37 @@ def main(support_digest: str | None = None) -> None:
         display(ext.segmentation_table())
         """),
         markdown("""
+        **Segmented trim (r26e).** The coding predicted above was simulated.
+        The 31 unit cells per side of the k 1.75 trim are regrouped into
+        seven 4-cell segments, selected by a 3-bit thermometer decoder,
+        plus binary cells of 2 and 1 for the two LSBs, so one code step
+        switches at most 7 cells instead of 31. The nominal transfer is
+        identical to the binary one (largest boundary difference 0.00 mV)
+        and monotonic at the five conditions (|DNL| ≤ 0.34 LSB). On the
+        same 200 seeds at five conditions (first table) it passes ±1 mV at
+        1 ns for 1000 of 1000 seeds (0.996–1.000), with no wrong or
+        unresolved decision, at the same TT energy (533.08 against
+        533.05 fJ) and the same rms |*m*| (0.34 mV). The step spread
+        follows the binary fit for 1, 3 and 7 switched cells (second
+        table), and local steps above 2 mV fall from 10 to 3 (one-sided
+        sign test p = 0.046). The Gaussian law under-predicts both counts
+        by about 1.8× (5.8 and 1.6), so the tail is heavier than Gaussian,
+        but it predicts the reduction (3.6× against 3.3× observed).
+        1000 against 999 passing seeds does not resolve the predicted
+        0.07 against 0.73 static misses per 1000; that needs about 10⁴
+        seeds.
+        """),
+        code("""
+        sg = ext.segmented_mc_table(extension)
+        display(sg)
+        p = sg.attrs["predicted_static_miss"]
+        print(f"law, static misses per 1000: binary {p['binary']:.2f}, "
+              f"segmented {p['segmented']:.2f}")
+        print("steps > 2 mV, one-sided sign test p "
+              f"{sg.attrs['tail_sign_test_p']:.3f}")
+        display(ext.segmented_law_table())
+        """),
+        markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
         bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
         The cost paragraph above refers to the r13 fix. The 6-bit designs have
@@ -1492,7 +1523,10 @@ def main(support_digest: str | None = None) -> None:
         segmented codings are predictions, not simulations; at k 1.75 the
         smallest nominal half range (24.9 mV) is close to the largest cold
         |b0| at 200 seeds (25.7 mV), so a larger k needs a cold Monte
-        Carlo with more seeds first.
+        Carlo with more seeds first. The r26e thermometer decoder is an
+        ideal behavioural source with no energy, delay or mismatch, each
+        4-cell segment is one device with the mismatch of four parallel
+        cells, and its step tails are counted, not fitted.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1522,7 +1556,9 @@ def main(support_digest: str | None = None) -> None:
         unit cells as well raises this to 996 of 1000 for 7.3% more energy.
         Widening the input pair to 1.75× (r26d) gives 999 of 1000 for 3.2%
         more, a gain not statistically resolved; the remaining miss is a
-        random carry step that thermometer MSBs are predicted to remove.
+        random carry step. With three thermometer MSBs (r26e) the 15- and
+        31-cell carries disappear, all 1000 seeds pass at the same energy,
+        and steps above 2 mV fall 3.3× (3.6× predicted by the step law).
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

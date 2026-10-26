@@ -414,6 +414,28 @@ def test_r26d_input_scale_carry_law_and_segmentation(data):
     assert list(s["full thermometer"]) == [0.53, 0.0]
 
 
+def test_r26e_segmented_trim(data):
+    t = ext.segmented_mc_table(data)
+    assert list(t["most cells per step"]) == [31, 7]
+    assert list(t["static |m| <= 1 mV"]) == ["999/1000", "1000/1000"]
+    assert list(t["+/-1 mV @ 1 ns (seeds)"]) == ["999/1000", "1000/1000"]
+    assert list(t["95% CI"]) == ["0.9944 - 1.0000", "0.9963 - 1.0000"]
+    assert list(t["wrong / unresolved decisions"]) == ["1 / 0", "0 / 0"]
+    assert list(t["max / rms |m| (mV)"]) == ["1.11 / 0.34", "0.82 / 0.34"]
+    assert list(t["local steps > 2 mV (observed / law)"]) == ["10 / 5.8", "3 / 1.6"]
+    assert list(t["TT energy at code 0 (fJ)"]) == [533.05, 533.08]
+    assert t.attrs["predicted_static_miss"] == {"binary": 0.73, "segmented": 0.066}
+    assert t.attrs["tail_sign_test_p"] == 0.0461
+    c = ext.segmented_law_table()
+    seg = c.loc["3 thermometer MSBs + 2 binary"]
+    assert list(seg["seeds"]) == [499, 258, 243]
+    assert list(seg["step sd (LSB)"]) == [0.153, 0.204, 0.268]
+    assert list(seg["binary fit (LSB)"]) == [0.147, 0.193, 0.261]
+    assert list(c.loc["binary (5 bits)", "seeds"]) == [508, 252, 133, 100, 5]
+    assert {d: (round(s0, 3), round(su, 3)) for d, (s0, su) in c.attrs["fit_lsb"].items()} == \
+        {"e5_k175": (0.118, 0.088), "g5_k175": (0.126, 0.09)}
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]

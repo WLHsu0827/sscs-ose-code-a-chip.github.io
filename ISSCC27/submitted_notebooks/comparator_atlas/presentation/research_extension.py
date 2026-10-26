@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "b546b4fde87108ff117496a8fc041e7b2eb1bb7c973ca0f8a9409635bec80a9e"
+MANIFEST_SHA256 = "db663569f081015cee93f70bf7924de0ab27f0d58bfc1dab526c292fce66be6e"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -928,6 +928,63 @@ def segmentation_table() -> pd.DataFrame:
             row[label] = round(sum(r["predicted_miss"][key] for r in seg), 2)
         rows.append(row)
     return pd.DataFrame(rows).set_index("input pair scale k")
+
+
+# r26e: the k = 1.75 trim with binary coding (r26d) and with 3 thermometer MSBs + 2 binary LSBs; the most cells
+# that one code step can switch
+SEG_DESIGNS = (("e5_k175", "r26d", "binary (5 bits)", 31), ("g5_k175", "r26e", "3 thermometer MSBs + 2 binary", 7))
+
+
+def segmented_mc_table(data: dict) -> pd.DataFrame:
+    """r26e: the segmented trim simulated with the same 200 paired MC seeds at the five DNL conditions as the binary
+    trim. 'local steps > 2 mV' counts the seeds whose bracketing code step exceeds 2 mV (so that a 1 mV input could
+    fall more than 1 mV from a boundary); the law column is the r26d binary fit applied to each design's step mix."""
+    compare = _json("r26e/compare_g5_k175.json")
+    if compare["n_seeds"] != len(BIT_WEIGHT_CONDS) * EQ_SEEDS:
+        raise RuntimeError("r26e comparison does not cover 200 seeds at each of the five conditions")
+    rows = []
+    for design, study, label, max_cells in SEG_DESIGNS:
+        seeds = _jsonl(data, f"{study}/seeds_{design}.jsonl")
+        for cond in BIT_WEIGHT_CONDS:
+            if sorted(r["seed"] for r in seeds if tuple(r["cond"]) == cond) != list(range(EQ_SEEDS)):
+                raise RuntimeError(f"{design} {cond}: Monte Carlo seeds are incomplete or duplicated")
+        m = np.array([r.get("fine_m_mv", r["m_mv"]) for r in seeds])
+        ok1 = sum(r["out_1mv_1ns"] == ["correct", "correct"] for r in seeds)
+        dec = [o for r in seeds for o in r["out_1mv_1ns"]]
+        lo, hi = _clopper_pearson(ok1, len(seeds))
+        tail = compare["step_tails"][design]
+        e = _json(f"{study}/memory_energy_{design}.json")["equalize 0"]
+        rows.append({"coding": label, "most cells per step": max_cells,
+                     "static |m| <= 1 mV": f"{int(np.sum(np.abs(m) <= 1.0))}/{len(seeds)}",
+                     "+/-1 mV @ 1 ns (seeds)": f"{ok1}/{len(seeds)}", "95% CI": f"{lo:.4f} - {hi:.4f}",
+                     "wrong / unresolved decisions": f"{dec.count('wrong')} / {dec.count('unresolved')}",
+                     "max / rms |m| (mV)": f"{np.max(np.abs(m)):.2f} / {np.sqrt(np.mean(m ** 2)):.2f}",
+                     "local steps > 2 mV (observed / law)": f"{tail['over_2mv']} / {tail['law_over_2mv']:.1f}",
+                     "TT energy at code 0 (fJ)": round(e["vdd_fj"] + e["clk_fj"], 2)})
+    table = pd.DataFrame(rows).set_index("coding")
+    table.attrs.update(predicted_static_miss=compare["predicted_static_miss_total"],
+                       tail_sign_test_p=compare["tail_sign_test_p_one_sided"])
+    return table
+
+
+def segmented_law_table() -> pd.DataFrame:
+    """r26e: local-step spread by the number n of unit cells a step switches, pooled over the five conditions and
+    normalized to each condition's 1-bit step, against the r26d binary fit sqrt(sigma0^2 + n sigma_u^2)."""
+    fit = _json("r26e/carry_e5_k175.json")["pooled_normalized"]
+    s0, su = fit["fit_sigma0_lsb"], fit["fit_sigma_unit_lsb"]
+    rows = []
+    for design, _, label, _ in SEG_DESIGNS:
+        classes = _json(f"r26e/carry_{design}.json")["pooled_normalized"]["classes"]
+        for n in sorted(classes, key=int):
+            c = classes[n]
+            rows.append({"coding": label, "unit cells switched": int(n), "seeds": c["count"],
+                         "step sd (LSB)": round(c["sd_lsb"], 3), "max step (LSB)": round(c["max_lsb"], 2),
+                         "binary fit (LSB)": round(math.sqrt(s0 ** 2 + int(n) * su ** 2), 3)})
+    table = pd.DataFrame(rows).set_index(["coding", "unit cells switched"])
+    table.attrs["fit_lsb"] = {d: (_json(f"r26e/carry_{d}.json")["pooled_normalized"]["fit_sigma0_lsb"],
+                                  _json(f"r26e/carry_{d}.json")["pooled_normalized"]["fit_sigma_unit_lsb"])
+                              for d, _, _, _ in SEG_DESIGNS}
+    return table
 
 
 def energy_screen_table(data: dict) -> pd.DataFrame:

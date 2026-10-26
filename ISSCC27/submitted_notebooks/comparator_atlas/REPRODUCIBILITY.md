@@ -610,7 +610,7 @@ not part of the sealed decision record of Sections 1-8; nothing in the
 specification map, the 49-condition data or the layout example is changed.
 
 **Saved results.** `results/research/` holds the archived outputs of studies
-r1-r26d (JSON, JSONL and CSV, LF line endings).
+r1-r26e (JSON, JSONL and CSV, LF line endings).
 `results/research/manifest.json` lists the SHA256 of every archived file and
 of every `research/*.py` script. `presentation/research_extension.py` pins the
 manifest's own SHA256 and refuses to draw Section 9 if the manifest, any
@@ -648,6 +648,7 @@ command line.
 | r26b | `r26b_unit.py`, `r26b_cost.py` | Single-bit weights of the width-binary trim over PVT, and the same trim built from unit cells (instance `m` = 2^k, same area): screen, transfer, range, paired MC and cost at k 1.25 and 1.5 |
 | r26c | `r26c_stats.py`, `r26c_refine.py`, `r26c_fine.py`, `r26c_eqscale.py`, `r26c_cost.py` | 200-seed paired MC of `u5_k150` at five conditions with 0.01 mV re-bisection of borderline seeds, the 0.01 mV nominal transfer (carry DNL), the equalizer built from 2^k unit devices (`e5_k150`): transfer, range, 200-seed MC, clkb inverter sweep, energy and memory |
 | r26d | `r26d_carry.py`, `r26d_segment.py` (with `r26c_eqscale.py`, `r26c_refine.py`, `r26c_stats.py`, `r26c_cost.py`) | The `e5` trim at input-pair scale 1.75 (`e5_k175`; transfer and range also at 1.625): 200-seed MC at the five conditions, energy and memory; local-step spread against the number of toggled bits (carry law) and a static-miss model with its prediction for segmented (thermometer-MSB) codings |
+| r26e | `r26e_seg.py`, `r26e_carry.py`, `r26e_compare.py`, `r26e_cost.py` (with `r26c_stats.py`) | The k 1.75 trim with three thermometer MSBs (seven 4-cell segments, ideal decoder) and two binary LSBs (`g5_k175`): transfer, 200-seed MC at the five conditions on the same seeds, energy and memory; step spread by switched cells and steps above 2 mV against the r26d law |
 
 **Re-running.** Live studies use the same project-local ngspice 47 and pinned
 SKY130 models as the full campaign (`node scripts/setup.mjs` on Windows;
@@ -777,4 +778,11 @@ and `r26c_cost.py 5 1.75`. `r26d_carry.py e5_k150 e5_k175` fits the step law
 on the per-seed candidates and `r26d_segment.py e5_k150 e5_k175` evaluates
 the miss model; neither runs a simulation. A cold k 1.75 condition takes
 about 50 minutes.
+r26e runs `r26e_seg.py check 1.75` and `dnl 1.75`, then
+`r26e_seg.py mc 1.75 <corner> <V> <T> 200` at the five conditions,
+`r26e_seg.py refine 1.75 <corner> <V> <T> 200` (no borderline seed),
+`r26c_stats.py g5_k175 200` and `r26e_cost.py 1.75`.
+`r26e_carry.py e5_k175 g5_k175` and `r26e_compare.py` compare the step
+classes and tails with the r26d law without simulation. Each condition takes
+about 45 minutes.
 None of these studies is silicon, Linux, Colab or external-human evidence.
