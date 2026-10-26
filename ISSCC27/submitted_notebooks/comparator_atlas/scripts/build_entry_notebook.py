@@ -1413,6 +1413,44 @@ def main(support_digest: str | None = None) -> None:
         display(ext.inverter_sweep_table(extension))
         """),
         markdown("""
+        **Input-pair scale and the carry law (r26d).** The trim's PVT gain
+        ratio is a property of its topology: the nominal SF/SS LSB ratio
+        is 1.51 at input-pair scale k 1.5 and again at k 1.75. k only
+        moves both ends together, so it sets where the design sits inside
+        a window: the hot step must stay below 2 mV with margin (mean
+        Monte Carlo 1-bit step ≤ 1.55 mV for 3σ at 0.15 mV), and the cold
+        LSB must cover the cold offsets (≥ 0.72 mV for 3σ of b0). k 1.5
+        breaks the hot bound (1.71 mV); k 1.75 meets both (1.36 mV hot,
+        0.81 mV cold). On the same 200 seeds at five conditions (first
+        table), k 1.75 passes ±1 mV at 1 ns for 999 of 1000 seeds
+        (0.994–1.000), with one wrong and no unresolved decision, at
+        533 fJ (+3.2%) and a 24.9–42.2 mV half range; the gain over 996
+        is not statistically resolved. The Monte Carlo mean 1-bit step is
+        10–17% above the nominal LSB at the hot corners only, so the
+        window must use it. The spread of a local step follows the
+        binary-DAC law √(σ0² + (2^j − 1)σu²) for j toggled bits (second
+        table), with σu ≈ 0.09 LSB (0.09–0.12 mV at every condition and
+        both k) and σ0 the 0.23 mV bisection grid. The nominal transfers
+        have no carry excess, so the large hot steps are random: 22 of
+        the 46 k 1.5 hot steps above 2 mV sit on 4-bit carries, and the
+        one k 1.75 miss is a 7 → 8 carry (|*m*| 1.11 mV). Fed with the
+        Monte Carlo step, the law predicts 4.6 static misses per 1000 at
+        k 1.5 and 0.7 at k 1.75 (3 and 1 observed) and, for codings that
+        were not simulated, 0.07 at k 1.75 with three thermometer MSBs
+        (last table): segmentation, not k, is the next knob.
+        """),
+        code("""
+        ks = ext.input_scale_table(extension)
+        display(ks)
+        for k, e in ks.attrs["energy_fj"].items():
+            lo, mid, hi = ks.attrs["half_range_mv"][k]
+            rho = ks.attrs["rho_sf_ss"][k]
+            print(f"k {k}: TT energy, code 0 {e:.0f} fJ; half range "
+                  f"{lo:.1f}/{mid:.1f}/{hi:.1f} mV; SF/SS LSB {rho:.2f}")
+        display(ext.carry_law_table())
+        display(ext.segmentation_table())
+        """),
+        markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
         bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
         The cost paragraph above refers to the r13 fix. The 6-bit designs have
@@ -1448,7 +1486,13 @@ def main(support_digest: str | None = None) -> None:
         and inverter devices are nominal, the inverter size was chosen after
         its sweep on nominal transfers, the 1 ns runs use the code from a
         0.2 mV bisection, and 200 seeds per condition bound a rate only to
-        about 2%.
+        about 2%. The r26d step law is fitted on the coarse bisection
+        candidates with few 4-bit carries (87 and 100 seeds), assumes
+        Gaussian steps and a residual uniform within a step, and its
+        segmented codings are predictions, not simulations; at k 1.75 the
+        smallest nominal half range (24.9 mV) is close to the largest cold
+        |b0| at 200 seeds (25.7 mV), so a larger k needs a cold Monte
+        Carlo with more seeds first.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1476,6 +1520,9 @@ def main(support_digest: str | None = None) -> None:
         five conditions (r26c) that design passes ±1 mV at 1 ns for 978 of
         1000 seeds, losing at the cold corners; building its equalizer from
         unit cells as well raises this to 996 of 1000 for 7.3% more energy.
+        Widening the input pair to 1.75× (r26d) gives 999 of 1000 for 3.2%
+        more, a gain not statistically resolved; the remaining miss is a
+        random carry step that thermometer MSBs are predicted to remove.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

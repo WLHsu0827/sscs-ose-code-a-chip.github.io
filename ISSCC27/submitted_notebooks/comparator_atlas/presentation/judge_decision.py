@@ -66,7 +66,11 @@ EXTENSION_SUMMARY = (
     "input pair widened 1.5× (r26b) ±1 mV reaches 240/240 paired decisions at SF, FF and TT for 4.8% "
     "more energy than r25. At 200 seeds over five conditions (r26c) it passes ±1 mV at 1 ns for 978/1000 "
     "seeds, losing at the cold corners to the per-bit equalizer it kept from r24c; building that "
-    "equalizer from unit cells too gives 996/1000, no unresolved decision, for 7.3% more energy.")
+    "equalizer from unit cells too gives 996/1000, no unresolved decision, for 7.3% more energy. "
+    "Widening the input pair to 1.75× (r26d) gives 999/1000 for 3.2% more (not statistically resolved); "
+    "the trim's PVT gain ratio (~1.5) is set by its topology, and the remaining miss follows a binary "
+    "carry law, step sd = √(σ0² + (2^j − 1)σu²) with σu ≈ 0.1 mV per unit cell, which predicts that "
+    "thermometer-coded MSBs would remove it.")
 
 
 def sha(path):

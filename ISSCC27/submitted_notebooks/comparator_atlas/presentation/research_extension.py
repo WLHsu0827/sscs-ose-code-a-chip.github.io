@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "35583e16d77f16da1b4b6fb2ed31d87055df11ea87e09e37ce146bf02dc6b61e"
+MANIFEST_SHA256 = "b546b4fde87108ff117496a8fc041e7b2eb1bb7c973ca0f8a9409635bec80a9e"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -841,6 +841,93 @@ def inverter_sweep_table(data: dict) -> pd.DataFrame:
     if [r["clkb inverter m"] for r in rows] != [1, 2, 4, 8]:
         raise RuntimeError("r26c inverter sweep rows changed")
     return pd.DataFrame(rows).set_index("clkb inverter m")
+
+
+# r26d: input-pair scale k of the unit-equalizer trim; the archive study that holds each design's files
+K_DESIGNS = (("e5_k150", "r26c", 1.5), ("e5_k175", "r26d", 1.75))
+SEGMENT_SCHEMES = (("binary", "binary (5 bits)"), ("seg_b3", "2 thermometer MSBs + 3 binary"),
+                   ("seg_b2", "3 thermometer MSBs + 2 binary"), ("seg_b1", "4 thermometer MSBs + 1 binary"),
+                   ("thermometer", "full thermometer"))
+
+
+def input_scale_table(data: dict) -> pd.DataFrame:
+    """r26d: the unit-equalizer trim at input-pair scale 1.5 (r26c) and 1.75, same 200 paired MC seeds at the five
+    DNL conditions. 'MC 1-bit step' is the mean local step of the seeds that sit between codes one bit apart; at
+    the hot corners it is 10-17% above the nominal LSB."""
+    rows = []
+    for design, study, k in K_DESIGNS:
+        seeds = _jsonl(data, f"{study}/seeds_{design}.jsonl")
+        transfer = {r["cond"][0]: r for r in _json(f"{study}/dnl_{design}.json")}
+        carry = {c["cond"][0]: c for c in _json(f"r26d/carry_{design}.json")["conditions"]}
+        for cond in (*BIT_WEIGHT_CONDS, None):
+            part = [r for r in seeds if cond is None or tuple(r["cond"]) == cond]
+            if cond is not None and sorted(r["seed"] for r in part) != list(range(EQ_SEEDS)):
+                raise RuntimeError(f"{design} {cond}: Monte Carlo seeds are incomplete or duplicated")
+            m = np.array([r.get("fine_m_mv", r["m_mv"]) for r in part])
+            b0 = np.array([r["b0_mv"] for r in part])
+            ok1 = sum(r["out_1mv_1ns"] == ["correct", "correct"] for r in part)
+            dec = [o for r in part for o in r["out_1mv_1ns"]]
+            lo, hi = _clopper_pearson(ok1, len(part))
+            row = {"condition": "pooled" if cond is None else _condition(list(cond)), "input pair scale k": k,
+                   "covered": f"{sum(r['covered'] for r in part)}/{len(part)}",
+                   "static |m| <= 1 mV": f"{int(np.sum(np.abs(m) <= 1.0))}/{len(part)}",
+                   "+/-1 mV @ 1 ns (seeds)": f"{ok1}/{len(part)}", "95% CI": f"{lo:.3f} - {hi:.3f}",
+                   "wrong / unresolved decisions": f"{dec.count('wrong')} / {dec.count('unresolved')}",
+                   "b0 sigma / max (mV)": f"{np.std(b0):.2f} / {np.max(np.abs(b0)):.1f}"}
+            if cond is None:
+                row["nominal LSB / MC 1-bit step (mV)"] = "-"
+            else:
+                c = cond[0]
+                row["nominal LSB / MC 1-bit step (mV)"] = (f"{abs(transfer[c]['lsb_mv']):.2f} / "
+                                                           f"{carry[c]['classes']['1']['mean_mv']:.2f}")
+            rows.append(row)
+    table = pd.DataFrame(rows).set_index(["condition", "input pair scale k"])
+    energy, half, rho = {}, {}, {}
+    for design, study, k in K_DESIGNS:
+        e = _json(f"{study}/memory_energy_{design}.json")["equalize 0"]
+        energy[k] = e["vdd_fj"] + e["clk_fj"]
+        h = [r["half_range_mv"] for r in _json(f"{study}/range_{design}.json")]
+        half[k] = (min(h), float(np.median(h)), max(h))
+        t = {r["cond"][0]: abs(r["lsb_mv"]) for r in _json(f"{study}/dnl_{design}.json")}
+        rho[k] = t["sf"] / t["ss"]
+    table.attrs.update(energy_fj=energy, half_range_mv=half, rho_sf_ss=rho)
+    return table
+
+
+def carry_law_table() -> pd.DataFrame:
+    """r26d: spread of the local trim step by the number j of magnitude bits that toggle (2^j - 1 unit cells switch),
+    pooled over the five conditions and normalized to each condition's mean 1-bit step, against the fitted law
+    sqrt(sigma0^2 + (2^j - 1) sigma_u^2)."""
+    rows = []
+    for design, _, k in K_DESIGNS:
+        pooled = _json(f"r26d/carry_{design}.json")["pooled_normalized"]
+        s0, su = pooled["fit_sigma0_lsb"], pooled["fit_sigma_unit_lsb"]
+        for j in ("1", "2", "3", "4"):
+            c = pooled["classes"][j]
+            n = 2 ** int(j) - 1
+            rows.append({"input pair scale k": k, "toggled bits j": int(j), "unit cells switched": n,
+                         "seeds": c["count"], "step sd (LSB)": round(c["sd_lsb"], 3),
+                         "fit (LSB)": round(math.sqrt(s0 ** 2 + n * su ** 2), 3)})
+    table = pd.DataFrame(rows).set_index(["input pair scale k", "toggled bits j"])
+    table.attrs["fit_lsb"] = {k: (_json(f"r26d/carry_{d}.json")["pooled_normalized"]["fit_sigma0_lsb"],
+                                  _json(f"r26d/carry_{d}.json")["pooled_normalized"]["fit_sigma_unit_lsb"])
+                              for d, _, k in K_DESIGNS}
+    return table
+
+
+def segmentation_table() -> pd.DataFrame:
+    """r26d: static misses per 1000 seeds (200 per condition, five conditions) predicted from the fitted step law,
+    for the simulated binary coding and for segmented codings that were not simulated, with the observed count."""
+    rows = []
+    for design, _, k in K_DESIGNS:
+        seg = _json(f"r26d/segment_{design}.json")["rows"]
+        if sorted(r["cond"][0] for r in seg) != ["ff", "fs", "sf", "ss", "tt"]:
+            raise RuntimeError(f"{design}: expected the segmentation model at the five DNL conditions")
+        row = {"input pair scale k": k, "observed (binary)": sum(r["observed_static_miss"] for r in seg)}
+        for key, label in SEGMENT_SCHEMES:
+            row[label] = round(sum(r["predicted_miss"][key] for r in seg), 2)
+        rows.append(row)
+    return pd.DataFrame(rows).set_index("input pair scale k")
 
 
 def energy_screen_table(data: dict) -> pd.DataFrame:

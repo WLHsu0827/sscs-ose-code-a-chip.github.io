@@ -386,6 +386,34 @@ def test_r26c_equalizer_monte_carlo_and_inverter_sweep(data):
     assert s.loc[4, "SS 1.62 V -40 C step min / mean / max (mV)"] == "0.86 / 0.95 / 1.00"
 
 
+def test_r26d_input_scale_carry_law_and_segmentation(data):
+    t = ext.input_scale_table(data)
+    pooled = t.xs("pooled", level="condition")
+    assert list(pooled["static |m| <= 1 mV"]) == ["997/1000", "999/1000"]
+    assert list(pooled["+/-1 mV @ 1 ns (seeds)"]) == ["996/1000", "999/1000"]
+    assert list(pooled["95% CI"]) == ["0.990 - 0.999", "0.994 - 1.000"]
+    assert list(pooled["wrong / unresolved decisions"]) == ["4 / 0", "1 / 0"]
+    assert list(t.xs(1.75, level="input pair scale k")["+/-1 mV @ 1 ns (seeds)"]) == \
+        ["200/200", "200/200", "200/200", "199/200", "200/200", "999/1000"]
+    assert t.loc[("SF 1.95 V 125 C", 1.5), "nominal LSB / MC 1-bit step (mV)"] == "1.46 / 1.71"
+    assert t.loc[("SF 1.95 V 125 C", 1.75), "nominal LSB / MC 1-bit step (mV)"] == "1.22 / 1.36"
+    assert t.loc[("SS 1.62 V -40 C", 1.75), "nominal LSB / MC 1-bit step (mV)"] == "0.81 / 0.81"
+    assert {k: round(e) for k, e in t.attrs["energy_fj"].items()} == {1.5: 517, 1.75: 533}
+    assert [round(x, 1) for x in t.attrs["half_range_mv"][1.75]] == [24.9, 32.5, 42.2]
+    assert {k: round(r, 2) for k, r in t.attrs["rho_sf_ss"].items()} == {1.5: 1.51, 1.75: 1.51}
+    c = ext.carry_law_table()
+    assert list(c.loc[1.5, "step sd (LSB)"]) == [0.123, 0.188, 0.221, 0.367]
+    assert list(c.loc[1.5, "fit (LSB)"]) == [0.122, 0.176, 0.252, 0.358]
+    assert list(c.loc[1.5, "seeds"]) == [539, 250, 119, 87]
+    assert {k: (round(s0, 3), round(su, 3)) for k, (s0, su) in c.attrs["fit_lsb"].items()} == \
+        {1.5: (0.083, 0.09), 1.75: (0.118, 0.088)}
+    s = ext.segmentation_table()
+    assert list(s["observed (binary)"]) == [3, 1]
+    assert list(s["binary (5 bits)"]) == [4.59, 0.73]
+    assert list(s["3 thermometer MSBs + 2 binary"]) == [2.46, 0.07]
+    assert list(s["full thermometer"]) == [0.53, 0.0]
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]
