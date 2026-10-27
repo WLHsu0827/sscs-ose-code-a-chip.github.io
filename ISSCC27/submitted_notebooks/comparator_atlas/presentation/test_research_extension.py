@@ -436,11 +436,45 @@ def test_r26e_segmented_trim(data):
         {"e5_k175": (0.118, 0.088), "g5_k175": (0.126, 0.09)}
 
 
+def test_r26f_tail_model_and_hold_cap(data):
+    t = ext.tail_model_table()
+    assert list(t["steps > 2 mV observed"]) == [10, 3, 10, 3]
+    assert list(t["with drift: predicted (P >= observed)"]) == \
+        ["6.77 (0.15)", "1.52 (0.20)", "8.14 (0.30)", "1.94 (0.31)"]
+    assert t.attrs["joint"]["delta_hat"] == 0.0053
+    assert t.attrs["joint"]["delta_ci95"] == [0.0016, 0.0089]
+    assert t.attrs["joint"]["per_condition_positive"] == 10
+    h = ext.hold_cap_table(data)
+    tt = h.loc[("TT 1.8 V 27 C", 0.5)]
+    assert list(tt["segment-gate dip (mV)"]) == [178, 103, 47, 15]
+    assert list(tt["boundary -31 / -16 (mV)"]) == \
+        ["30.62 / 15.97", "31.20 / 16.55", "31.49 / 16.55", "31.49 / 16.85"]
+    assert set(h["ideal decoder (mV)"].loc["TT 1.8 V 27 C"]) == {"31.79 / 16.85"}
+    assert h.loc[("SS 1.62 V -40 C", 0.5, 4.0), "boundary -31 / -16 (mV)"] == "25.05 / 12.45"
+    assert list(h.loc["TT 1.8 V 27 C"].xs(0.0, level=1)["segment-gate dip (mV)"]) == [134, 178, 186]
+
+
+def test_r26f_transistor_decoder():
+    t = ext.decoder_table()
+    assert list(t["LSB change (%)"]) == [-3.7, -4.7, -4.3, -1.5, -1.6]
+    assert list(t["segment-gate dip (mV)"]) == [178, 126, 113, 262, 232]
+    assert t["monotonic"].all() and t["max |DNL| (LSB)"].max() == 0.39
+    assert list(t["same code (seeds)"]) == ["33/40", "33/40", "35/40", "25/40", "30/40"]
+    assert set(t["static |m| <= 1 mV, decoder / ideal"]) == {"40 / 40"}
+    assert set(t["+/-1 mV @ 1 ns, decoder / ideal"]) == {"40 / 40"}
+    p = t.attrs["pooled"]
+    assert (p["n"], p["same_code"], p["static_1mv"], p["pass_1mv_1ns"], p["pass_1mv_1ns_ref"]) == \
+        (200, 156, 200, 200, 200)
+    assert t.attrs["devices"] == 96 and round(t.attrs["gate_area_um2"], 1) == 39.6
+    assert round(t.attrs["leak_worst_na"], 2) == 2.93 and t.attrs["leak_cond"] == "SF 1.95 V 125 C"
+    assert {d: round(v, 2) for d, v in t.attrs["energy_fj"].items()} == {"d5_k175": 533.02, "g5_k175": 533.08}
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]
     for text in texts:
-        assert "R13_" not in text and "R19_MC" not in text and "R19MCMAX" not in text
+        assert "R13_" not in text and "R19_MC" not in text and "R19MCMAX" not in text and "MC_TEXT" not in text
     assert len(ext.MANIFEST_SHA256) == 64
 
 

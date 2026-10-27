@@ -71,7 +71,11 @@ EXTENSION_SUMMARY = (
     "the trim's PVT gain ratio (~1.5) is set by its topology, and the remaining miss follows a binary "
     "carry law, step sd = √(σ0² + (2^j − 1)σu²) with σu ≈ 0.1 mV per unit cell, which predicts that "
     "thermometer-coded MSBs would remove it. Simulated with three thermometer MSBs (r26e, ideal decoder), "
-    "the trim passes 1000/1000 at the same energy and its steps above 2 mV fall 3.3× (3.6× predicted).")
+    "the trim passes 1000/1000 at the same energy and its steps above 2 mV fall 3.3× (3.6× predicted). "
+    "Its steps are Gaussian with a 0.53%-per-cell carry drift (r26f); a transistor-level CMOS decoder adds "
+    "no measurable energy and keeps the transfer monotonic, but clock-edge gate kickback weakens the "
+    "segments 1.5–4.7% (a 4 µm MOS hold capacitor per segment gate removes it), and on 40 paired seeds "
+    "at each of the five conditions it still passes 200/200, as the ideal decoder does.")
 
 
 def sha(path):

@@ -1465,8 +1465,9 @@ def main(support_digest: str | None = None) -> None:
         follows the binary fit for 1, 3 and 7 switched cells (second
         table), and local steps above 2 mV fall from 10 to 3 (one-sided
         sign test p = 0.046). The Gaussian law under-predicts both counts
-        by about 1.8× (5.8 and 1.6), so the tail is heavier than Gaussian,
-        but it predicts the reduction (3.6× against 3.3× observed).
+        by about 1.8× (5.8 and 1.6) but predicts the reduction (3.6×
+        against 3.3× observed); r26f below finds that the shortfall is
+        counting noise plus a small carry drift, not a heavy tail.
         1000 against 999 passing seeds does not resolve the predicted
         0.07 against 0.73 static misses per 1000; that needs about 10⁴
         seeds.
@@ -1480,6 +1481,59 @@ def main(support_digest: str | None = None) -> None:
         print("steps > 2 mV, one-sided sign test p "
               f"{sg.attrs['tail_sign_test_p']:.3f}")
         display(ext.segmented_law_table())
+        """),
+        markdown("""
+        **Step tails and a real decoder (r26f).** Two loose ends of r26e.
+        First, the tail. An exact likelihood model of the observed steps
+        (Gaussian; length-biased, because a seed lands in a step with
+        probability proportional to its width; quantized on the bisection
+        grid) finds normalized kurtosis 3.02 (binary) and 2.80 (segmented),
+        Gaussian 3, and a small carry drift of 0.53% of an LSB per switched
+        cell (95% CI 0.16–0.89%, likelihood-ratio p = 0.006; positive in 10
+        of 10 design-condition fits). With the drift no count is rejected
+        (P ≥ observed ≥ 0.15), and the law fitted on the segmented trim
+        predicts the binary trim's 15- and 31-cell tail out of sample (8.1
+        against 10 steps above 2 mV, first table). The tail is Gaussian.
+
+        Second, the decoder. r26e's ideal sources are replaced by static
+        CMOS gates (48 devices per side, L 0.5 µm). The decoder is logically
+        correct, adds no measurable energy (533.02 against 533.08 fJ),
+        leaks at most 2.93 nA, and keeps the transfer monotonic
+        (|DNL| ≤ 0.39 LSB). It is not electrically neutral: at the clock
+        edge the falling tail kicks each segment gate down by 113–262 mV
+        through the switch's gate capacitance, which an ideal source hides,
+        and the segments become 1.5–4.7% weaker than the binary cells
+        (second table). The dip is a capacitive divider: one coupling
+        capacitance (4.3–5.1 fF) onto one gate-node capacitance
+        (11.3–12.1 fF) fits every hold-capacitor and condition point, so a
+        longer decoder channel, which slows the recovery 5×, barely changes
+        it, while a 4 µm square MOS capacitor on each segment gate restores
+        the ideal boundaries within one 0.29 mV bisection step at TT, SS and
+        SF, for 224 µm² of gate area (third table). Without the capacitor
+        the weaker segments cost no decision: on the same 40 seeds at each
+        of the five conditions, with every shared mismatch draw identical,
+        the decoder passes static |m| ≤ 1 mV and ±1 mV at 1 ns for 200 of
+        200 seeds, as the ideal decoder does; 156 seeds keep their code and
+        44 move one code outward (max |m| 0.82 mV for both), and the two
+        largest cold offsets use code 27 of 31. At 40 seeds per condition
+        a one-in-200 effect is not excluded.
+        """),
+        code("""
+        tm = ext.tail_model_table()
+        display(tm)
+        j = tm.attrs["joint"]
+        lo, hi = (100 * x for x in j["delta_ci95"])
+        print(f"carry drift {100 * j['delta_hat']:.2f}% LSB per switched "
+              f"cell (95% CI {lo:.2f}-{hi:.2f}%), LR p {j['p_delta0']:.4f}")
+        dt = ext.decoder_table()
+        display(dt)
+        e = dt.attrs["energy_fj"]
+        print(f"decoder: {dt.attrs['devices']} devices (both sides), "
+              f"{dt.attrs['gate_area_um2']:.1f} um2 gate area, leakage "
+              f"<= {dt.attrs['leak_worst_na']:.2f} nA ({dt.attrs['leak_cond']})"
+              f"; TT energy at code 0 {e['d5_k175']:.2f} fJ "
+              f"(ideal decoder {e['g5_k175']:.2f} fJ)")
+        display(ext.hold_cap_table(extension))
         """),
         markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
@@ -1524,9 +1578,17 @@ def main(support_digest: str | None = None) -> None:
         smallest nominal half range (24.9 mV) is close to the largest cold
         |b0| at 200 seeds (25.7 mV), so a larger k needs a cold Monte
         Carlo with more seeds first. The r26e thermometer decoder is an
-        ideal behavioural source with no energy, delay or mismatch, each
+        ideal behavioural source with no energy, delay or mismatch, and each
         4-cell segment is one device with the mismatch of four parallel
-        cells, and its step tails are counted, not fitted.
+        cells. The r26f tail model is fitted on 13 steps above 2 mV, its
+        drift is a phenomenological term linear in the switched cells, and
+        it assumes a residual uniform within a step. The r26f decoder has
+        nominal sizing, swept only in channel length; the two binary LSB
+        switches stay on ideal sources; there is no layout, so the gate
+        node has no wiring capacitance; the hold capacitor's energy and
+        Monte Carlo were not simulated, the divider fit assumes the oxide
+        capacitance (8.4 fF/µm²), and its Monte Carlo has 40 seeds per
+        condition.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1559,6 +1621,11 @@ def main(support_digest: str | None = None) -> None:
         random carry step. With three thermometer MSBs (r26e) the 15- and
         31-cell carries disappear, all 1000 seeds pass at the same energy,
         and steps above 2 mV fall 3.3× (3.6× predicted by the step law).
+        r26f finds those steps Gaussian with a 0.53%-per-cell carry drift,
+        and replaces the ideal decoder with CMOS gates: no measurable
+        energy, monotonic, segments 1.5–4.7% weaker through clock-edge
+        gate kickback (removed by a 4 µm MOS capacitor per segment gate),
+        and 200/200 paired seeds still pass.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

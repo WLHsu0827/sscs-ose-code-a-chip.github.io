@@ -7,7 +7,8 @@ The source defaults to research/out. Raw SPICE caches and the per-condition r2/r
 nor are the r23 per-device noise tables (research/cache/r23, rebuilt by r23_noise.py tables), nor the r24
 trajectories and per-condition ISF scans (rebuilt by r24_isf.py traj / isf / atlas; r24_report.json keeps
 every number the Notebook uses), nor the raw 200-seed r26c/r26d/r26e MC files (~14 MB; rebuilt by r26b_unit.py mc,
-r26c_eqscale.py mc and r26e_seg.py mc, summarized per seed by r26c_stats.py).
+r26c_eqscale.py mc and r26e_seg.py mc, summarized per seed by r26c_stats.py), nor the raw 40-seed r26f MC files
+(rebuilt by r26f_dec.py mc, summarized by r26f_dec.py compare).
 """
 import hashlib
 import json
@@ -66,6 +67,7 @@ STUDIES = {
              "r26d/segment_e5_*.json"],
     "r26e": ["r26c/seeds_g5_k175.jsonl", "r26c/stats_g5_k175.json", "r26b/dnl_g5_k175.json",
              "r26b/memory_energy_g5_k175.json", "r26e/carry_*.json", "r26e/compare_g5_k175.json"],
+    "r26f": ["r26b/dnl_d5_k175.json", "r26b/memory_energy_d5_k175.json", "r26f/*.json"],
 }
 # r26c extends the r26b MC files to 200 seeds; r26b keeps its 40 (r26c archives a per-seed summary instead).
 SEED_LIMIT = {"r26b": 40}

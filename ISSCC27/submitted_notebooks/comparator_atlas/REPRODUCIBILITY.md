@@ -610,7 +610,7 @@ not part of the sealed decision record of Sections 1-8; nothing in the
 specification map, the 49-condition data or the layout example is changed.
 
 **Saved results.** `results/research/` holds the archived outputs of studies
-r1-r26e (JSON, JSONL and CSV, LF line endings).
+r1-r26f (JSON, JSONL and CSV, LF line endings).
 `results/research/manifest.json` lists the SHA256 of every archived file and
 of every `research/*.py` script. `presentation/research_extension.py` pins the
 manifest's own SHA256 and refuses to draw Section 9 if the manifest, any
@@ -649,6 +649,7 @@ command line.
 | r26c | `r26c_stats.py`, `r26c_refine.py`, `r26c_fine.py`, `r26c_eqscale.py`, `r26c_cost.py` | 200-seed paired MC of `u5_k150` at five conditions with 0.01 mV re-bisection of borderline seeds, the 0.01 mV nominal transfer (carry DNL), the equalizer built from 2^k unit devices (`e5_k150`): transfer, range, 200-seed MC, clkb inverter sweep, energy and memory |
 | r26d | `r26d_carry.py`, `r26d_segment.py` (with `r26c_eqscale.py`, `r26c_refine.py`, `r26c_stats.py`, `r26c_cost.py`) | The `e5` trim at input-pair scale 1.75 (`e5_k175`; transfer and range also at 1.625): 200-seed MC at the five conditions, energy and memory; local-step spread against the number of toggled bits (carry law) and a static-miss model with its prediction for segmented (thermometer-MSB) codings |
 | r26e | `r26e_seg.py`, `r26e_carry.py`, `r26e_compare.py`, `r26e_cost.py` (with `r26c_stats.py`) | The k 1.75 trim with three thermometer MSBs (seven 4-cell segments, ideal decoder) and two binary LSBs (`g5_k175`): transfer, 200-seed MC at the five conditions on the same seeds, energy and memory; step spread by switched cells and steps above 2 mV against the r26d law |
+| r26f | `r26f_tail.py`, `r26f_dec.py`, `r26f_kick.py` | Exact-likelihood step model (length bias, grid quantization, carry drift per switched cell) fitted on `e5_k175` and `g5_k175` and cross-predicting their steps above 2 mV; `g5_k175` with a transistor-level thermometer decoder (`d5_k175`): decoder leakage at three channel lengths over 45 conditions, transfer, segment-gate kickback at the clock edge, a hold-capacitor sweep, energy, and 40-seed paired MC at the five conditions against the ideal decoder |
 
 **Re-running.** Live studies use the same project-local ngspice 47 and pinned
 SKY130 models as the full campaign (`node scripts/setup.mjs` on Windows;
@@ -785,4 +786,12 @@ r26e runs `r26e_seg.py check 1.75` and `dnl 1.75`, then
 `r26e_carry.py e5_k175 g5_k175` and `r26e_compare.py` compare the step
 classes and tails with the r26d law without simulation. Each condition takes
 about 45 minutes.
+r26f: `r26f_tail.py e5_k175 g5_k175` fits the step model from the archived
+per-seed records without simulation. `r26f_dec.py leak` (with `R26F_L` = 0.15,
+0.5 or 1), `dnl 1.75`, `kick 1.75`, `cost 1.75`, then
+`r26f_dec.py mc 1.75 <corner> <V> <T> 40` at the five conditions and
+`r26f_dec.py compare 40`; `r26f_kick.py <L> [H] [corner]` runs the
+channel-length and hold-capacitor probes. Each 40-seed condition takes about
+50 minutes with 12 workers; the raw 40-seed d5 MC files are summarized in
+`compare_d5_k175.json` and not archived.
 None of these studies is silicon, Linux, Colab or external-human evidence.

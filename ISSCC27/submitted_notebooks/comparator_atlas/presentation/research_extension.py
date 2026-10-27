@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "db663569f081015cee93f70bf7924de0ab27f0d58bfc1dab526c292fce66be6e"
+MANIFEST_SHA256 = "fc8a64cb0a5b254b2bdc17be7f198e04dac43d04ef27e819b980abc77826cb66"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -985,6 +985,85 @@ def segmented_law_table() -> pd.DataFrame:
                                   _json(f"r26e/carry_{d}.json")["pooled_normalized"]["fit_sigma_unit_lsb"])
                               for d, _, _, _ in SEG_DESIGNS}
     return table
+
+
+TAIL_LABELS = {"e5_k175": "binary", "g5_k175": "segmented"}
+
+
+def tail_model_table() -> pd.DataFrame:
+    """r26f: exact-likelihood step model (Gaussian, length-biased, quantized) with and without a carry drift delta
+    per switched cell, fitted on one design and predicting the count of local steps > 2 mV of each design."""
+    tail = _json("r26f/tail_g5_k175.json")
+    rows = []
+    for key, t in tail["transfer"].items():
+        src, tgt = key.split("->")
+        rows.append({"fitted on": TAIL_LABELS[src], "predicts": TAIL_LABELS[tgt],
+                     "steps > 2 mV observed": t["observed"],
+                     "Gaussian: predicted (P >= observed)":
+                         f"{t['delta0']['predicted']:.2f} ({t['delta0']['p_ge_observed']:.2f})",
+                     "with drift: predicted (P >= observed)":
+                         f"{t['delta']['predicted']:.2f} ({t['delta']['p_ge_observed']:.2f})",
+                     "static misses per 1000, with drift": round(t["delta"]["static_miss_predicted"], 2)})
+    table = pd.DataFrame(rows).set_index(["fitted on", "predicts"])
+    table.attrs.update(joint=tail["joint"],
+                       kurtosis={TAIL_LABELS[d]: v["kurtosis_normalized"] for d, v in tail["designs"].items()},
+                       steps={TAIL_LABELS[d]: v["steps"] for d, v in tail["designs"].items()})
+    return table
+
+
+DECODER = "d5_k175"
+DECODER_SEEDS = 40
+
+
+def decoder_table() -> pd.DataFrame:
+    """r26f: the r26e segmented trim with a transistor-level thermometer decoder (d5) against the ideal decoder (g5)
+    at the five DNL conditions: LSB, segment-gate dip at the clock edge, transfer and paired Monte Carlo."""
+    kick = _json(f"r26f/kick_{DECODER}.json")
+    comp = _json(f"r26f/compare_{DECODER}.json")
+    dnl = {d: {tuple(r["cond"]): r for r in _json(f"{s}/dnl_{d}.json")}
+           for d, s in ((DECODER, "r26f"), ("g5_k175", "r26e"))}
+    if comp["pooled"]["n"] != len(BIT_WEIGHT_CONDS) * DECODER_SEEDS:
+        raise RuntimeError("r26f comparison does not cover 40 seeds at each of the five conditions")
+    rows = []
+    for cond in BIT_WEIGHT_CONDS:
+        k = next(r for r in kick if tuple(r["cond"]) == cond and r["design"] == DECODER)
+        c = next(r for r in comp["rows"] if tuple(r["cond"]) == cond)
+        d, g = dnl[DECODER][cond], dnl["g5_k175"][cond]
+        rows.append({"condition": _condition(cond),
+                     "LSB ideal / decoder (mV)": f"{abs(g['lsb_mv']):.3f} / {abs(d['lsb_mv']):.3f}",
+                     "LSB change (%)": round(100 * (abs(d["lsb_mv"]) / abs(g["lsb_mv"]) - 1), 1),
+                     "segment-gate dip (mV)": round(k["dip_mv"]), "dip > 10 mV (ps)": round(k["below_10mv_ps"]),
+                     "max |DNL| (LSB)": round(d["dnl_max_lsb"], 2), "monotonic": bool(d["monotonic"]),
+                     "same code (seeds)": f"{c['same_code']}/{c['n']}",
+                     "static |m| <= 1 mV, decoder / ideal": f"{c['static_1mv']} / {c['static_1mv_ref']}",
+                     "+/-1 mV @ 1 ns, decoder / ideal": f"{c['pass_1mv_1ns']} / {c['pass_1mv_1ns_ref']}"})
+    table = pd.DataFrame(rows).set_index("condition")
+    leak = _json("r26f/leak_decoder_L0.5.json")
+    e = {d: _json(f"{s}/memory_energy_{d}.json")["equalize 0"] for d, s in ((DECODER, "r26f"), ("g5_k175", "r26e"))}
+    table.attrs.update(pooled=comp["pooled"], leak_worst_na=leak["worst"]["both_sides_worst_na"],
+                       leak_cond=_condition(leak["worst"]["cond"]), devices=leak["devices"],
+                       gate_area_um2=leak["gate_area_um2"],
+                       energy_fj={d: v["vdd_fj"] + v["clk_fj"] for d, v in e.items()})
+    return table
+
+
+def hold_cap_table(data: dict) -> pd.DataFrame:
+    """r26f: decoder channel length L and a square nfet hold capacitor (side H) on each of the 14 segment gates
+    against the trim boundaries at codes -31 / -16 and the gate dip, with the ideal decoder's boundaries."""
+    ref = {tuple(r["cond"]): r["b_mv"] for r in _json("r26e/dnl_g5_k175.json")}
+    rows = []
+    for name in sorted(n for n in data["files"] if Path(n).match("r26f/kick_L*_H*.json")):
+        r = _json(name)
+        g = ref[tuple(r["cond"])]
+        rows.append({"condition": _condition(r["cond"]), "decoder L (um)": r["L"],
+                     "hold cap side H (um)": r["hold_um"],
+                     "added gate area (um2)": round(14 * r["hold_um"] ** 2, 1),
+                     "segment-gate dip (mV)": round(r["dip_mv"]),
+                     "boundary -31 / -16 (mV)": f"{r['b_mv']['-31']:.2f} / {r['b_mv']['-16']:.2f}",
+                     "ideal decoder (mV)": f"{g['-31']:.2f} / {g['-16']:.2f}"})
+    if not rows:
+        raise RuntimeError("No archived r26f hold-capacitor probe")
+    return pd.DataFrame(rows).set_index(["condition", "decoder L (um)", "hold cap side H (um)"]).sort_index()
 
 
 def energy_screen_table(data: dict) -> pd.DataFrame:
