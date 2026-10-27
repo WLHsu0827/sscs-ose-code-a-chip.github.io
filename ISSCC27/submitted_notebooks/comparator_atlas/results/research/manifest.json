@@ -256,7 +256,7 @@
   "r26e/memory_energy_g5_k175.json": "9a10d072fe0286bad18c794c6558380e56839a5cb85a4a4d04c21a39430a2675",
   "r26e/seeds_g5_k175.jsonl": "c8a1287b1872277f6655164b4d41cbc0b354cc0b22520503166cb78c523f98aa",
   "r26e/stats_g5_k175.json": "76e7fda1608ea94cf53ffe1352276297d03cd881e2c5f0ba1c6ae44f8346268b",
-  "r26f/compare_d5_k175.json": "54137202bb3b9850fd0fb58626e4088eedfbdf54b63ba63897044feb1e94c231",
+  "r26f/compare_d5_k175.json": "a0cef2359e982e910ea414765f4f16e9888c9de1599f49b84c13c40f8bcb4759",
   "r26f/dnl_d5_k175.json": "75a5d55add27b0509e342562507a739ef206c73de266d9c425cbc6c24a42449d",
   "r26f/kick_L0.15_H0.json": "75321762fbb190d89ec1017228bf0e1ce94541712b5c103b0871d767f5d3b282",
   "r26f/kick_L0.5_H0.json": "c449535140c7b822999c818d040529e3f4a18ef93030e276cf62725e9785878f",
@@ -334,7 +334,7 @@
  "schema": "comparator-atlas-research-archive-v1",
  "scope": "Local follow-on schematic and archived-extraction simulations; see research/README.md",
  "script_sha256": {
-  "archive_results.py": "a08ad8fc962bf37c25ac0cfe68dc34764ae8ca54a21d85bcf1eb7c9f6051e730",
+  "archive_results.py": "b78629588d999ef81613424bb138cc06dbcdc2630166b1e57575057de9e132a3",
   "r10_combo5b.py": "3ac68ef41a8ec4fa613adb413d4c6e72397914cd6d79939d6958d7e1242bb25c",
   "r11_post_layout_5b.py": "8e50f92d7bc309052f3c128efe4f8d4c873ef5764dfc0da180ccdf82d6477265",
   "r12_gate_trim.py": "eec1efb2ba9557437a4cf14b5d92b13969c4760c5a571c3a6456f241a03e5c53",

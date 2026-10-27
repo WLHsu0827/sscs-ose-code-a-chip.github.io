@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "9263bbadd326383b7a60611fb294dedf788a33366941086b149cb43d6ae50805"
+MANIFEST_SHA256 = "bbfce9c37aed6e1dd8a0c01bdf251b8437be2d7c148687ecfe808b7ea8413f49"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -1012,7 +1012,7 @@ def tail_model_table() -> pd.DataFrame:
 
 
 DECODER = "d5_k175"
-DECODER_SEEDS = 40
+DECODER_SEEDS = 200
 
 
 def decoder_table() -> pd.DataFrame:
@@ -1023,7 +1023,7 @@ def decoder_table() -> pd.DataFrame:
     dnl = {d: {tuple(r["cond"]): r for r in _json(f"{s}/dnl_{d}.json")}
            for d, s in ((DECODER, "r26f"), ("g5_k175", "r26e"))}
     if comp["pooled"]["n"] != len(BIT_WEIGHT_CONDS) * DECODER_SEEDS:
-        raise RuntimeError("r26f comparison does not cover 40 seeds at each of the five conditions")
+        raise RuntimeError("r26f comparison does not cover 200 seeds at each of the five conditions")
     rows = []
     for cond in BIT_WEIGHT_CONDS:
         k = next(r for r in kick if tuple(r["cond"]) == cond and r["design"] == DECODER)

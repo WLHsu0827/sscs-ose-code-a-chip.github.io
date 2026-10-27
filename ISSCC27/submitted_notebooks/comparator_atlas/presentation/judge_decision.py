@@ -74,8 +74,8 @@ EXTENSION_SUMMARY = (
     "the trim passes 1000/1000 at the same energy and its steps above 2 mV fall 3.3× (3.6× predicted). "
     "Its steps are Gaussian with a 0.53%-per-cell carry drift (r26f); a transistor-level CMOS decoder adds "
     "no measurable energy and keeps the transfer monotonic, but clock-edge gate kickback weakens the "
-    "segments 1.5–4.7% (a 4 µm MOS hold capacitor per segment gate removes it), and on 40 paired seeds "
-    "at each of the five conditions it still passes 200/200, as the ideal decoder does. The kickback follows "
+    "segments 1.5–4.7% (a 4 µm MOS hold capacitor per segment gate removes it), and on 200 paired seeds "
+    "at each of the five conditions it still passes 1000/1000, as the ideal decoder does. The kickback follows "
     "one capacitive-divider law over switch sizes, drivers and hold capacitors (r26g, within 8%), and a hold "
     "capacitor is about 3× more area-efficient than scaling the switch drivers.")
 

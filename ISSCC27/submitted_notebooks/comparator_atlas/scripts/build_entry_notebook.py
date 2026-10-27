@@ -1510,13 +1510,13 @@ def main(support_digest: str | None = None) -> None:
         it, while a 4 µm square MOS capacitor on each segment gate restores
         the ideal boundaries within one 0.29 mV bisection step at TT, SS and
         SF, for 224 µm² of gate area (third table). Without the capacitor
-        the weaker segments cost no decision: on the same 40 seeds at each
+        the weaker segments cost no decision: on the same 200 seeds at each
         of the five conditions, with every shared mismatch draw identical,
-        the decoder passes static |m| ≤ 1 mV and ±1 mV at 1 ns for 200 of
-        200 seeds, as the ideal decoder does; 156 seeds keep their code and
-        44 move one code outward (max |m| 0.82 mV for both), and the two
-        largest cold offsets use code 27 of 31. At 40 seeds per condition
-        a one-in-200 effect is not excluded.
+        the decoder passes static |m| ≤ 1 mV and ±1 mV at 1 ns for 1000 of
+        1000 seeds, as the ideal decoder does; 797 seeds keep their code,
+        200 move one code outward and 3 one code inward (max |m| 0.82 mV
+        for both), and the three largest cold offsets use code 27 of 31.
+        At 200 seeds per condition a one-in-1000 effect is not excluded.
         """),
         code("""
         tm = ext.tail_model_table()
@@ -1613,7 +1613,7 @@ def main(support_digest: str | None = None) -> None:
         nominal sizing, swept only in channel length; there is no layout,
         so the gate node has no wiring capacitance; the hold capacitor's
         energy and Monte Carlo were not simulated, the divider fit assumes
-        the oxide capacitance (8.4 fF/µm²), and its Monte Carlo has 40 seeds
+        the oxide capacitance (8.4 fF/µm²), and its Monte Carlo has 200 seeds
         per condition. The r26g buffers, scaled drivers and hold capacitors
         are nominal, without Monte Carlo or energy; they are compared by
         boundaries at codes 0, ±3, ±28 and ±31, not full transfers, and the
@@ -1655,7 +1655,7 @@ def main(support_digest: str | None = None) -> None:
         and replaces the ideal decoder with CMOS gates: no measurable
         energy, monotonic, segments 1.5–4.7% weaker through clock-edge
         gate kickback (removed by a 4 µm MOS capacitor per segment gate),
-        and 200/200 paired seeds still pass. r26g reduces the kickback to
+        and 1000/1000 paired seeds still pass. r26g reduces the kickback to
         one capacitive-divider law across switch sizes, drivers and hold
         capacitors, and finds the hold capacitor about 3× more
         area-efficient than scaling the switch drivers.

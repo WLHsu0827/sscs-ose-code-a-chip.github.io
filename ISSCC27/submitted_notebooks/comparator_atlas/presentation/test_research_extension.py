@@ -459,12 +459,12 @@ def test_r26f_transistor_decoder():
     assert list(t["LSB change (%)"]) == [-3.7, -4.7, -4.3, -1.5, -1.6]
     assert list(t["segment-gate dip (mV)"]) == [178, 126, 113, 262, 232]
     assert t["monotonic"].all() and t["max |DNL| (LSB)"].max() == 0.39
-    assert list(t["same code (seeds)"]) == ["33/40", "33/40", "35/40", "25/40", "30/40"]
-    assert set(t["static |m| <= 1 mV, decoder / ideal"]) == {"40 / 40"}
-    assert set(t["+/-1 mV @ 1 ns, decoder / ideal"]) == {"40 / 40"}
+    assert list(t["same code (seeds)"]) == ["165/200", "164/200", "182/200", "136/200", "150/200"]
+    assert set(t["static |m| <= 1 mV, decoder / ideal"]) == {"200 / 200"}
+    assert set(t["+/-1 mV @ 1 ns, decoder / ideal"]) == {"200 / 200"}
     p = t.attrs["pooled"]
     assert (p["n"], p["same_code"], p["static_1mv"], p["pass_1mv_1ns"], p["pass_1mv_1ns_ref"]) == \
-        (200, 156, 200, 200, 200)
+        (1000, 797, 1000, 1000, 1000)
     assert t.attrs["devices"] == 96 and round(t.attrs["gate_area_um2"], 1) == 39.6
     assert round(t.attrs["leak_worst_na"], 2) == 2.93 and t.attrs["leak_cond"] == "SF 1.95 V 125 C"
     assert {d: round(v, 2) for d, v in t.attrs["energy_fj"].items()} == {"d5_k175": 533.02, "g5_k175": 533.08}
