@@ -1536,6 +1536,33 @@ def main(support_digest: str | None = None) -> None:
         display(ext.hold_cap_table(extension))
         """),
         markdown("""
+        **A dip law and the cheapest fix (r26g).** r26f left the two binary
+        LSB switches on ideal sources. Buffering them with the decoder's own
+        output inverter gives them dips too, but smaller ones (TT 72 and
+        119 mV for the 1- and 2-cell switches, 179 mV for a 4-cell segment).
+        The dip is one capacitive divider, dip = A·m/(m + m0 + c_h·a): m is
+        the switch size in unit cells, m0 the driver's output capacitance in
+        unit-switch couplings (3.0–4.1) and c_h·a the hold capacitor
+        (4.4–6.4 units per µm²). One three-parameter fit per condition covers
+        the three buffered switch sizes and the three hold capacitors within
+        8%, and predicts out of sample that scaling each driver with its
+        switch makes every dip the same, A/(1 + m0), within 8% (first
+        table). Equal drivers therefore leave a relative segment error that
+        buffering the LSBs does not remove. Scaling the drivers halves the
+        range loss for 43 µm² (boundaries bisected to 0.01 mV, second
+        table), but a hold capacitor is about 3× more area-efficient: 1 µm
+        per segment gate (14 µm²) already loses less over the full span at
+        every condition (over the segment span at four of five), because the
+        loss per mV of dip grows with driver strength. Along the
+        hold-capacitor family the segment loss is roughly proportional to
+        the dip (0.024–0.037% per mV at TT, SS and FS), so the law sizes the
+        capacitor for a target loss; 2 µm (56 µm²) leaves at most 1.25%.
+        """),
+        code("""
+        display(ext.dip_law_table())
+        display(ext.driver_fix_table())
+        """),
+        markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
         bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
         The cost paragraph above refers to the r13 fix. The 6-bit designs have
@@ -1583,12 +1610,15 @@ def main(support_digest: str | None = None) -> None:
         cells. The r26f tail model is fitted on 13 steps above 2 mV, its
         drift is a phenomenological term linear in the switched cells, and
         it assumes a residual uniform within a step. The r26f decoder has
-        nominal sizing, swept only in channel length; the two binary LSB
-        switches stay on ideal sources; there is no layout, so the gate
-        node has no wiring capacitance; the hold capacitor's energy and
-        Monte Carlo were not simulated, the divider fit assumes the oxide
-        capacitance (8.4 fF/µm²), and its Monte Carlo has 40 seeds per
-        condition.
+        nominal sizing, swept only in channel length; there is no layout,
+        so the gate node has no wiring capacitance; the hold capacitor's
+        energy and Monte Carlo were not simulated, the divider fit assumes
+        the oxide capacitance (8.4 fF/µm²), and its Monte Carlo has 40 seeds
+        per condition. The r26g buffers, scaled drivers and hold capacitors
+        are nominal, without Monte Carlo or energy; they are compared by
+        boundaries at codes 0, ±3, ±28 and ±31, not full transfers, and the
+        growth of the loss per mV with driver strength is measured, not
+        modelled.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1625,7 +1655,10 @@ def main(support_digest: str | None = None) -> None:
         and replaces the ideal decoder with CMOS gates: no measurable
         energy, monotonic, segments 1.5–4.7% weaker through clock-edge
         gate kickback (removed by a 4 µm MOS capacitor per segment gate),
-        and 200/200 paired seeds still pass.
+        and 200/200 paired seeds still pass. r26g reduces the kickback to
+        one capacitive-divider law across switch sizes, drivers and hold
+        capacitors, and finds the hold capacitor about 3× more
+        area-efficient than scaling the switch drivers.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

@@ -610,7 +610,7 @@ not part of the sealed decision record of Sections 1-8; nothing in the
 specification map, the 49-condition data or the layout example is changed.
 
 **Saved results.** `results/research/` holds the archived outputs of studies
-r1-r26f (JSON, JSONL and CSV, LF line endings).
+r1-r26g (JSON, JSONL and CSV, LF line endings).
 `results/research/manifest.json` lists the SHA256 of every archived file and
 of every `research/*.py` script. `presentation/research_extension.py` pins the
 manifest's own SHA256 and refuses to draw Section 9 if the manifest, any
@@ -650,7 +650,7 @@ command line.
 | r26d | `r26d_carry.py`, `r26d_segment.py` (with `r26c_eqscale.py`, `r26c_refine.py`, `r26c_stats.py`, `r26c_cost.py`) | The `e5` trim at input-pair scale 1.75 (`e5_k175`; transfer and range also at 1.625): 200-seed MC at the five conditions, energy and memory; local-step spread against the number of toggled bits (carry law) and a static-miss model with its prediction for segmented (thermometer-MSB) codings |
 | r26e | `r26e_seg.py`, `r26e_carry.py`, `r26e_compare.py`, `r26e_cost.py` (with `r26c_stats.py`) | The k 1.75 trim with three thermometer MSBs (seven 4-cell segments, ideal decoder) and two binary LSBs (`g5_k175`): transfer, 200-seed MC at the five conditions on the same seeds, energy and memory; step spread by switched cells and steps above 2 mV against the r26d law |
 | r26f | `r26f_tail.py`, `r26f_dec.py`, `r26f_kick.py` | Exact-likelihood step model (length bias, grid quantization, carry drift per switched cell) fitted on `e5_k175` and `g5_k175` and cross-predicting their steps above 2 mV; `g5_k175` with a transistor-level thermometer decoder (`d5_k175`): decoder leakage at three channel lengths over 45 conditions, transfer, segment-gate kickback at the clock edge, a hold-capacitor sweep, energy, and 40-seed paired MC at the five conditions against the ideal decoder |
-
+| r26g | `r26g_drv.py` (with `r26f_dec.py`) | `d5_k175` with the two binary LSB switches buffered like the decoder outputs (`b5_k175`) and with every switch driver scaled with its switch (`s5_k175`): segment- and LSB-gate kickback waveforms at code -31, boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV for the ideal decoder, `d5`, `b5`, `s5` and `d5` with 1, 2 and 4 µm hold capacitors at the five conditions, and the capacitive-divider dip-law fit |
 **Re-running.** Live studies use the same project-local ngspice 47 and pinned
 SKY130 models as the full campaign (`node scripts/setup.mjs` on Windows;
 `NGSPICE_EXE` may name another ngspice 47 console). From the entry directory:
@@ -794,4 +794,10 @@ per-seed records without simulation. `r26f_dec.py leak` (with `R26F_L` = 0.15,
 channel-length and hold-capacitor probes. Each 40-seed condition takes about
 50 minutes with 12 workers; the raw 40-seed d5 MC files are summarized in
 `compare_d5_k175.json` and not archived.
+r26g: `r26g_drv.py kick` (and with `R26G_SCALE=1`), `kick d` (with
+`R26F_HOLD` unset, 1, 2 or 4), `probe`, then `probe d` with `R26F_HOLD` = 1, 2
+and 4, and `law`, which fits the dip law from the archived kick and probe
+summaries without simulation. Each probe family takes about 40 minutes with
+12 workers; the per-run `_probe_*.jsonl` logs are summarized in
+`probe_drivers_*.json` and not archived.
 None of these studies is silicon, Linux, Colab or external-human evidence.

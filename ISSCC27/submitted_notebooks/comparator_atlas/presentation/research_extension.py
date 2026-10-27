@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "fc8a64cb0a5b254b2bdc17be7f198e04dac43d04ef27e819b980abc77826cb66"
+MANIFEST_SHA256 = "9263bbadd326383b7a60611fb294dedf788a33366941086b149cb43d6ae50805"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -1064,6 +1064,54 @@ def hold_cap_table(data: dict) -> pd.DataFrame:
     if not rows:
         raise RuntimeError("No archived r26f hold-capacitor probe")
     return pd.DataFrame(rows).set_index(["condition", "decoder L (um)", "hold cap side H (um)"]).sort_index()
+
+
+DIP_LAW = "r26g/dip_law_k175.json"
+DRIVER_FIXES = ("d5", "b5", "s5", "d5 H1", "d5 H2", "d5 H4")
+DRIVER_LABELS = {"d5": "CMOS decoder, LSBs on ideal sources", "b5": "+ LSB buffers (equal drivers)",
+                 "s5": "+ drivers scaled with the switch", "d5 H1": "decoder + 1 um hold caps",
+                 "d5 H2": "decoder + 2 um hold caps", "d5 H4": "decoder + 4 um hold caps"}
+
+
+def _dip_law() -> list[dict]:
+    law = _json(DIP_LAW)
+    if [tuple(r["cond"]) for r in law] != list(BIT_WEIGHT_CONDS):
+        raise RuntimeError("r26g dip law does not cover the five DNL conditions in order")
+    return law
+
+
+def dip_law_table() -> pd.DataFrame:
+    """r26g: per condition, the fit of dip = A m / (m + m0 + c_h a) to the buffered 4 / 2 / 1-cell switches and the
+    three hold capacitors (m = switch size in unit cells, a = hold-capacitor area per gate), and its out-of-sample
+    prediction for drivers scaled with their switch, A / (1 + m0)."""
+    rows = []
+    for r in _dip_law():
+        s = r["s5_meas_mv"]
+        rows.append({"condition": _condition(r["cond"]), "A (mV)": round(r["A_mv"]),
+                     "m0 (unit switches)": round(r["m0"], 2), "c_h (units/um2)": round(r["c_h_per_um2"], 2),
+                     "worst fit error (%)": round(100 * r["max_rel_err"], 1),
+                     "scaled drivers, predicted dip (mV)": round(r["s5_pred_mv"], 1),
+                     "measured segment / LSB1 / LSB0 (mV)": f"{s[0]:.1f} / {s[1]:.1f} / {s[2]:.1f}",
+                     "prediction error (%)": round(100 * r["s5_pred_err"], 1)})
+    return pd.DataFrame(rows).set_index("condition")
+
+
+def driver_fix_table() -> pd.DataFrame:
+    """r26g: added gate area, TT segment-gate dip and the loss of the segment span (codes +/-28) and of the full
+    span (+/-31) against the ideal decoder, from boundaries bisected to 0.01 mV, for the driver and hold fixes."""
+    law = _dip_law()
+    rows = []
+    for fix in DRIVER_FIXES:
+        tt = law[0]["designs"][fix]
+        row = {"design": DRIVER_LABELS[fix], "added gate area (um2)": tt["area_um2"],
+               "TT segment dip (mV)": round(tt["seg_dip_mv"]),
+               "TT loss per mV of dip (%/mV)": round(tt["seg_loss_pct_per_mv"], 4)}
+        for r in law:
+            d = r["designs"][fix]
+            loss = f"{d['seg_loss_pct']:.2f} / {d['full_loss_pct']:.2f}"
+            row[f"{_condition(r['cond'])} segment / full loss (%)"] = loss
+        rows.append(row)
+    return pd.DataFrame(rows).set_index("design")
 
 
 def energy_screen_table(data: dict) -> pd.DataFrame:

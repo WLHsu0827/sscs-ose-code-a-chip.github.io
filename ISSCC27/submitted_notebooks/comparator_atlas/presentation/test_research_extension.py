@@ -470,6 +470,26 @@ def test_r26f_transistor_decoder():
     assert {d: round(v, 2) for d, v in t.attrs["energy_fj"].items()} == {"d5_k175": 533.02, "g5_k175": 533.08}
 
 
+def test_r26g_dip_law_and_driver_fixes():
+    law = ext.dip_law_table()
+    assert list(law.index) == ["TT 1.8 V 27 C", "SS 1.62 V -40 C", "FS 1.62 V -40 C", "SF 1.95 V 125 C",
+                               "FF 1.95 V 125 C"]
+    assert list(law["A (mV)"]) == [330, 271, 223, 423, 388]
+    assert law["worst fit error (%)"].max() < 8 and law["prediction error (%)"].max() < 8
+    assert list(law["scaled drivers, predicted dip (mV)"]) == [72.5, 52.9, 45.9, 106.6, 91.4]
+    t = ext.driver_fix_table()
+    assert list(t["added gate area (um2)"].round(1)) == [0.0, 6.6, 42.9, 14.0, 56.0, 224.0]
+    assert list(t["TT segment dip (mV)"]) == [178, 179, 76, 103, 47, 15]
+    cols = [c for c in t.columns if c.endswith("loss (%)")]
+    seg, full = ({d: [float(v.split(" / ")[i]) for v in t.loc[d, cols]] for d in t.index} for i in (0, 1))
+    lab = ext.DRIVER_LABELS
+    s5, h1, h2, h4, d5 = (seg[lab[k]] for k in ("s5", "d5 H1", "d5 H2", "d5 H4", "d5"))
+    assert all(a < b for a, b in zip(full[lab["d5 H1"]], full[lab["s5"]]))
+    assert sum(a < b for a, b in zip(h1, s5)) == 4
+    assert all(a > b > c > d for a, b, c, d in zip(d5, h1, h2, h4))
+    assert d5[0] == 4.55 and max(h2) <= 1.25
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]
