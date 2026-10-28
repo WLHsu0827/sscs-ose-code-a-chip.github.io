@@ -610,7 +610,7 @@ not part of the sealed decision record of Sections 1-8; nothing in the
 specification map, the 49-condition data or the layout example is changed.
 
 **Saved results.** `results/research/` holds the archived outputs of studies
-r1-r26i (JSON, JSONL and CSV, LF line endings).
+r1-r26j (JSON, JSONL and CSV, LF line endings).
 `results/research/manifest.json` lists the SHA256 of every archived file and
 of every `research/*.py` script. `presentation/research_extension.py` pins the
 manifest's own SHA256 and refuses to draw Section 9 if the manifest, any
@@ -653,6 +653,7 @@ command line.
 | r26g | `r26g_drv.py` (with `r26f_dec.py`) | `d5_k175` with the two binary LSB switches buffered like the decoder outputs (`b5_k175`) and with every switch driver scaled with its switch (`s5_k175`): segment- and LSB-gate kickback waveforms at code -31, boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV for the ideal decoder, `d5`, `b5`, `s5` and `d5` with 1, 2 and 4 µm hold capacitors at the five conditions, and the capacitive-divider dip-law fit |
 | r26h | `r26h_thev.py`, `r26h_states.py`, `r26h_lincap.py` (with `r26g_drv.py`) | `g5_k175` with each segment source behind a linear series resistor and optional shunt capacitor (`h5_k175`): segment-gate kickback waveforms at code -31 and boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV for eight (R, C) points at the five conditions (plus a 10 Ω kick as a check against the ideal source), tabulated against the r26g MOS designs; then all 14 gate states per design at code -31, linear drivers fitted per condition to the MOS on and off gates (symmetric, state-aware with separate on / off R and C, and H1 controls with only the off-state R or C changed) and d5 with an ideal 8.3 fF linear hold capacitor, probed the same way |
 | r26i | `r26i_drv.py` (with `r26g_drv.py`) | `d5_k175` with the segment output inverters' pull-down or pull-up multiplied by 4, nfet hold capacitors of 1, 1.4 and 1.72 µm and a 1 µm pfet hold capacitor (ten variants including a plain 1 µm rerun): segment-gate kickback at code -31 and boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV at the five conditions, tabulated with the r26g / r26h references and added gate area |
+| r26j | `r26j_verify.py` (with `r26i_drv.py`) | The r26i fixes (d5, H1, H1.4, H1.72, N4 H1, H1 PH1, N4 H1 PH1) under Vth-mismatch Monte Carlo (seeds 0-19 at the five conditions, each paired with `g5_k175` on the same seed; boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV), with the b1 bit-2 gate-net capacitance (1.22 fF to vss, s, vin, tail and x) scaled by 1 and 4 on all 14 segment gates, TT energy per decision at codes 0 and ±31, decoder leakage at the five conditions, a SKY130 design-rule footprint, and the r26b calibration Monte Carlo for H1.4 and N4 H1 |
 **Re-running.** Live studies use the same project-local ngspice 47 and pinned
 SKY130 models as the full campaign (`node scripts/setup.mjs` on Windows;
 `NGSPICE_EXE` may name another ngspice 47 console). From the entry directory:
@@ -823,4 +824,10 @@ for (MN, MP, HOLD, PH) = (1, 1, 1, 0), (4, 1, 1, 0), (1, 4, 1, 0), (1, 1, 1, 1),
 (4, 1, 1, 1), (4, 1, 0, 0), (1, 1, 1.4, 0) and (1, 1, 1.72, 0), then `table`,
 which checks the plain rerun against r26g and writes `fixes_k175.json`. Each
 variant takes about 20 minutes with 3 workers (five variants ran side by side).
+r26j: with the same `R26I_MN` / `R26I_MP` / `R26F_HOLD` / `R26I_PH` settings for
+the seven designs (and `R26J_REF=1` for the `g5_k175` reference), `r26j_verify.py
+mcloss 20`, `para` and `energy`; `mcflow 20` for H1.4 and N4 H1; then `table`,
+which pairs every design with the reference seed by seed and writes
+`verify_k175.json`. The loss Monte Carlo takes about 4 hours per design with 2
+workers, and the calibration Monte Carlo about 1.5 hours per condition with 6.
 None of these studies is silicon, Linux, Colab or external-human evidence.

@@ -1640,6 +1640,42 @@ def main(support_digest: str | None = None) -> None:
         display(ext.fixes_table())
         """),
         markdown("""
+        **Checking the fixes (r26j).** The r26i variants were nominal. r26j
+        repeats them under Vth-mismatch Monte Carlo (20 seeds at all five
+        conditions, each design paired with the ideal-decoder reference on
+        the same seed), with the b1-extracted gate-net capacitance (1.22 fF
+        from a segment gate to vss, s, vin, tail and x) added once and four
+        times to all 14 segment gates, and with TT energy per decision and
+        decoder leakage. Mismatch barely moves the segment loss (standard
+        deviation at most 0.14 percentage points per condition, means within
+        0.07 of nominal), and every area-matched ranking of r26i holds in all
+        20 seeds: H1.4 stays below N4 H1 by 0.27 ± 0.07 points and below
+        H1 PH1 by 0.36, H1.72 below N4 + PH1 by 0.33, and N4 H1 below H1 by
+        0.35. No fix changes TT energy by more than 0.18 fJ out of 451 fJ per
+        decision, because the hold capacitors are charged only when a code
+        changes (about 53 fJ per toggled 1.4 µm gate, during calibration);
+        N4 raises the worst decoder leakage from 2.93 to 4.10 nA (SF,
+        1.95 V, 125 C). Layout coupling is where the two fixes part. With the
+        extracted gate net, the capacitor-only design loses ground (H1.4
+        1.82% → 2.00%) while N4 H1 improves (2.09% → 2.01%): the strong
+        pull-down holds the off gates against the coupling, and the
+        capacitance to vss then acts as extra hold. At four times the
+        extracted capacitance N4 H1 reaches 1.77% against 2.20% for H1.4 and
+        1.92% for H1.72. A footprint estimated from SKY130 rules (each extra
+        finger or capacitor with its contacted diffusion and half spacing)
+        charges N4 more than its gate area: near 5.5 µm² H1.72 gives 1.44%
+        (1.55% with the extracted net) against 2.09% (2.01%) for N4 H1. The
+        r26b calibration Monte Carlo, rerun for H1.4 and N4 H1, trims every
+        seed and condition to ±1 mV with a 1 ns decision, as d5 does. The
+        rule therefore gains one clause: size the nfet hold capacitor for
+        the worst corner with the extracted gate net included, and add the
+        4× pull-down when the routed gate net couples more strongly than the
+        b1 extraction or the corner spread matters.
+        """),
+        code("""
+        display(ext.verify_table())
+        """),
+        markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
         bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
         The cost paragraph above refers to the r13 fix. The 6-bit designs have
@@ -1701,8 +1737,13 @@ def main(support_digest: str | None = None) -> None:
         path by which an off gate couples into the boundary is not
         isolated, and the linear hold capacitor is ideal because the pinned
         PDK checkout has no MIM capacitor model. The r26i variants are
-        nominal ten-design comparisons without Monte Carlo, layout or
-        energy, and their area is gate area only.
+        nominal ten-design comparisons with gate area only. r26j's 20 seeds
+        are not a yield estimate, and one mismatch draw covers all four
+        fingers of the N4 device; its gate net is the b1 bit-2 extraction
+        scaled by 1 and 4 for every segment at nominal conditions, not a
+        routed layout; its footprint is a design-rule estimate, not a drawn
+        cell; its calibration Monte Carlo covers H1.4 and N4 H1 only; and
+        the leakage models have no gate tunnelling.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1747,7 +1788,10 @@ def main(support_digest: str | None = None) -> None:
         the remaining MOS difference to the off gates' strong pull-down and
         depleted MOS capacitor; r26i turns this into a cheap pull-down fix
         for the hot corners, while a larger nfet hold capacitor remains the
-        most area-efficient fix for the worst corner.
+        most area-efficient fix for the worst corner. r26j keeps these
+        rankings in all 20 Monte Carlo seeds at no measurable energy cost,
+        and finds the pull-down gaining value once the gate net couples more
+        strongly than the b1 extraction.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

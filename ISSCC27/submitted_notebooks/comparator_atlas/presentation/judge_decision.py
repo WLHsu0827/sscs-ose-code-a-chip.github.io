@@ -82,7 +82,9 @@ EXTENSION_SUMMARY = (
     "from the dip's shape rather than the MOS device; the remaining MOS difference comes from the off gates (strong "
     "NMOS pull-down, depleted MOS hold capacitor), which a state-aware linear driver reproduces within 0.08 "
     "percentage points. A 4× decoder pull-down (r26i) then cuts the hot-corner loss 3–7× and the worst corner from "
-    "2.50% to 2.09%, but at equal area a larger nfet hold capacitor still gives the lower worst corner (1.82%).")
+    "2.50% to 2.09%, but at equal area a larger nfet hold capacitor still gives the lower worst corner (1.82%). "
+    "Monte Carlo (r26j) keeps these rankings in 20 of 20 seeds with no measurable energy cost, and at four times the "
+    "extracted gate-net coupling the pull-down becomes the better fix (1.77% against 2.20%).")
 
 
 def sha(path):

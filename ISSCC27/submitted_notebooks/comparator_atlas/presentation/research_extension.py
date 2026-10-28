@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "e4ae83f6ddd1b66c0c5a39231f63cd7e672b380659e218e9dcb653036c2cd0f2"
+MANIFEST_SHA256 = "8115d27f714329b880e38d2b6e8aff1917037706ea5c1ecacb7c899c27c0a798"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -1197,6 +1197,33 @@ def fixes_table() -> pd.DataFrame:
         for r in d["rows"]:
             row[f"{_condition(r['cond'])} dip / loss"] = f"{r['seg_dip_mv']:.0f} / {r['seg_loss_pct']:.2f}"
         row["worst loss (%)"] = round(d["worst_loss_pct"], 2)
+        out.append(row)
+    return pd.DataFrame(out).set_index("design")
+
+
+VERIFY = "r26j/verify_k175.json"
+
+
+def verify_table() -> pd.DataFrame:
+    """r26j: the r26i fixes under mismatch Monte Carlo (worst of the five conditions per seed, paired with g5), with
+    the b1-extracted gate-net capacitance (x1, x4), TT energy per decision, decoder leakage and the calibration Monte
+    Carlo; footprint is a SKY130 rule estimate per segment gate; written by r26j_verify.py table."""
+    data = _json(VERIFY)
+    if [tuple(c) for c in data["conds"]] != list(BIT_WEIGHT_CONDS):
+        raise RuntimeError("r26j checks do not cover the five DNL conditions")
+    out = []
+    for lab, d in data["designs"].items():
+        mc, w = d["mc"], d["mc"]["per_seed_worst_pct"]
+        flow = d["flow"]
+        row = {"design": lab, "gate / footprint (um2)": f"{d['gate_area_um2']:.2f} / {d['footprint_um2']:.2f}",
+               "nominal worst (%)": round(d["nominal_worst_pct"], 2),
+               f"MC worst, {mc['n_seeds']} seeds (%)": f"{sum(w) / len(w):.2f} [{min(w):.2f}, {max(w):.2f}]",
+               "MC SF / FF max (%)": round(max(mc["per_seed_hot_pct"]), 2),
+               "gate net x1 / x4 worst (%)": " / ".join(f"{d['para_worst_abs_pct'][k]:.2f}" for k in ("1", "4")),
+               "TT energy change (fJ)": round(d["energy"]["tt_vdd_delta_fj"], 2),
+               "leakage (nA)": round(d["energy"]["leak_worst_na"], 2),
+               "calibration MC, +/-1 mV at 1 ns": (f"{sum(r['pass_1mv_1ns'] for r in flow)}/{sum(r['n'] for r in flow)}"
+                                                   if flow else "-")}
         out.append(row)
     return pd.DataFrame(out).set_index("design")
 

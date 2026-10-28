@@ -9,7 +9,8 @@ trajectories and per-condition ISF scans (rebuilt by r24_isf.py traj / isf / atl
 every number the Notebook uses), nor the raw 200-seed r26c/r26d/r26e MC files (~14 MB; rebuilt by r26b_unit.py mc,
 r26c_eqscale.py mc and r26e_seg.py mc, summarized per seed by r26c_stats.py), nor the raw 200-seed r26f MC files
 (rebuilt by r26f_dec.py mc, summarized by r26f_dec.py compare), nor the r26g / r26h / r26i per-run probe logs
-(`_probe_*.jsonl`, summarized in probe_drivers_*.json, probe_R*_C*.json and probe_d5_*.json).
+(`_probe_*.jsonl`, summarized in probe_drivers_*.json, probe_R*_C*.json and probe_d5_*.json), nor the r26j
+calibration Monte Carlo files (r26j/mc_*.jsonl, rebuilt by r26j_verify.py mcflow and summarized in verify_k175.json).
 """
 import hashlib
 import json
@@ -73,6 +74,8 @@ STUDIES = {
     "r26h": ["r26h/kick_R*_C*.json", "r26h/probe_R*_C*.json", "r26h/thevenin_*.json", "r26h/states_*.json",
              "r26h/kick_d5_lin*.json", "r26h/probe_d5_lin*.json"],
     "r26i": ["r26i/kick_d5_*.json", "r26i/probe_d5_*.json", "r26i/fixes_k175.json"],
+    "r26j": ["r26j/sigma_d5_*.json", "r26j/_mcloss_*.jsonl", "r26j/_para_*.jsonl", "r26j/energy_*.json",
+             "r26j/verify_k175.json"],
 }
 # r26c extends the r26b MC files to 200 seeds; r26b keeps its 40 (r26c archives a per-seed summary instead).
 SEED_LIMIT = {"r26b": 40}

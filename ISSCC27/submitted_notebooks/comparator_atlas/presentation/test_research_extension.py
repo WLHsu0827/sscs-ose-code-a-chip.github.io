@@ -558,6 +558,32 @@ def test_r26i_fixes():
     assert abs(area["d5 H1.4"] - area["d5 N4 H1"]) < 0.05 and abs(area["d5 H1.72"] - area["d5 N4 H1 PH1"]) < 0.05
 
 
+def test_r26j_verify():
+    t = ext.verify_table()
+    data = ext._json(ext.VERIFY)
+    d = data["designs"]
+    assert list(t.index) == ["d5", "d5 H1", "d5 H1.4", "d5 H1.72", "d5 N4 H1", "d5 H1 PH1", "d5 N4 H1 PH1"]
+    assert len(data["seeds"]) == 20
+    assert all(max(v["mc"]["sd_pct"]) < 0.15 for v in d.values())  # mismatch barely moves the segment loss
+    assert all(abs(sum(v["mc"]["per_seed_worst_pct"]) / 20 - v["nominal_worst_pct"]) < 0.1 for v in d.values())
+    assert all(p["seeds"] == p["n"] == 20 for p in data["worst_rank_pairs"].values())  # r26i's ranking, every seed
+    assert all(v["energy"]["tt_vdd_delta_fj"] < 0.5 for v in d.values())
+    ref = ext._json("r26f/memory_energy_d5_k175.json")  # r26f's d5 energy, reproduced by the r26j path
+    assert all(abs(d["d5"]["energy"]["tt_vdd_fj"][c] - ref[f"equalize {c}"]["vdd_fj"]) < 1e-6 for c in ("0", "31", "-31"))
+    leak = {k: v["energy"]["leak_worst_na"] for k, v in d.items()}
+    assert leak["d5 N4 H1"] > 1.3 * leak["d5 H1"] and abs(leak["d5 H1.4"] - leak["d5"]) < 1e-6
+    fp = {k: v["footprint_um2"] for k, v in d.items()}
+    assert fp["d5 H1.4"] < 0.8 * fp["d5 N4 H1"] and abs(fp["d5 H1.72"] - fp["d5 N4 H1"]) < 0.3
+    para = {k: v["para_worst_abs_pct"] for k, v in d.items()}
+    assert abs(para["d5 H1.4"]["1"] - para["d5 N4 H1"]["1"]) < 0.05  # extracted net: area-matched tie
+    assert para["d5 N4 H1"]["4"] < para["d5 H1.72"]["4"] < para["d5 H1.4"]["4"]  # x4: the pull-down wins
+    assert para["d5 H1.72"]["1"] < para["d5 N4 H1"]["1"]  # footprint-matched at x1: the larger capacitor
+    flow = {k: v["flow"] for k, v in d.items() if v["flow"]}
+    assert set(flow) == {"d5 H1.4", "d5 N4 H1"}
+    for rows in flow.values():
+        assert sum(r["n"] for r in rows) == 100 and sum(r["pass_1mv_1ns"] for r in rows) == 100
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]
