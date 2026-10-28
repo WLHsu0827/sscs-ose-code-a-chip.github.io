@@ -1615,6 +1615,31 @@ def main(support_digest: str | None = None) -> None:
         display(ext.thevenin_state_table())
         """),
         markdown("""
+        **Turning the off-gate finding into a fix (r26i).** Three PDK-only
+        changes act on the off state: a 4× NMOS pull-down in the 14 segment
+        output inverters (N4, +0.98 µm² gate area per segment gate), a 1 µm
+        pfet hold capacitor next to the nfet one (PH1, full capacitance when
+        the gate is low, so the pair is nearly state-independent without a
+        MIM model), or both. On top of the 1 µm nfet capacitor, N4 lowers
+        the worst corner from 2.50% to 2.09% and the SF / FF loss from
+        1.11 / 1.10% to 0.32 / 0.16%; PH1 gives 2.16% worst and 0.41 /
+        0.26%, better than r26h's ideal linear capacitor. A 4× pull-up
+        instead (P4) lowers the dip by about 40% yet raises the hot-corner
+        loss, as the dip-shape result predicts. Area-matched, however, a
+        larger nfet capacitor still wins the worst corner, which is cold and
+        set by the on-gate dip: at about 2 µm² a 1.4 µm capacitor reaches
+        1.82% against 2.09% (N4) and 2.16% (PH1), and at about 3 µm² a
+        1.72 µm capacitor 1.44% against 1.75% (N4 + PH1). The off-state
+        fixes buy the hot corners instead (SF / FF at most 0.32% against
+        0.76% at 2 µm²). The design rule stays r26g's: size the nfet hold
+        capacitor for the worst corner, and add the cheap 4× pull-down when
+        the corner spread matters. The plain 1 µm design rerun through the
+        same script reproduces r26g's five losses exactly.
+        """),
+        code("""
+        display(ext.fixes_table())
+        """),
+        markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
         bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
         The cost paragraph above refers to the r13 fix. The 6-bit designs have
@@ -1675,7 +1700,9 @@ def main(support_digest: str | None = None) -> None:
         fourteen, the state-aware drivers are fitted at code −31 only, the
         path by which an off gate couples into the boundary is not
         isolated, and the linear hold capacitor is ideal because the pinned
-        PDK checkout has no MIM capacitor model.
+        PDK checkout has no MIM capacitor model. The r26i variants are
+        nominal ten-design comparisons without Monte Carlo, layout or
+        energy, and their area is gate area only.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1718,8 +1745,9 @@ def main(support_digest: str | None = None) -> None:
         area-efficient than scaling the switch drivers; r26h shows with a
         linear driver that this follows from the shape of the dip, and traces
         the remaining MOS difference to the off gates' strong pull-down and
-        depleted MOS capacitor; a linear hold capacitor halves the hot-corner
-        loss but not the worst corner.
+        depleted MOS capacitor; r26i turns this into a cheap pull-down fix
+        for the hot corners, while a larger nfet hold capacitor remains the
+        most area-efficient fix for the worst corner.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

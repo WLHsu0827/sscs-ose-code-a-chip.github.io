@@ -540,6 +540,24 @@ def test_r26h_state_aware_fit():
     assert abs(max(x[1] for x in fix) - max(x[2] for x in h1)) < 0.05  # worst corner unchanged
 
 
+def test_r26i_fixes():
+    t = ext.fixes_table()
+    assert list(t.index) == ["d5", "d5 H1", "d5 H2", "d5 + 8.3 fF linear (r26h)", "d5 H1.4", "d5 H1.72", "d5 H1 PH1",
+                             "d5 P4 H1", "d5 N4", "d5 N4 H1", "d5 N4 H1 PH1"]
+    worst = t["worst loss (%)"].to_dict()
+    loss = {d: [float(t.loc[d, c].split(" / ")[1]) for c in t.columns if c.endswith("dip / loss")] for d in t.index}
+    hot = {d: max(v[3:]) for d, v in loss.items()}
+    assert worst["d5 H1"] == 2.50 and worst["d5 H2"] == 1.25
+    assert worst["d5 N4 H1"] < 2.1 and worst["d5 H1 PH1"] < worst["d5 + 8.3 fF linear (r26h)"]
+    assert hot["d5 N4 H1"] < 0.35 * hot["d5 H1"]
+    assert worst["d5 H1.4"] < min(worst["d5 N4 H1"], worst["d5 H1 PH1"])  # ~2 um2: the larger nfet cap wins the worst
+    assert worst["d5 H1.72"] < worst["d5 N4 H1 PH1"]  # ~3 um2
+    assert hot["d5 N4 H1"] < 0.5 * hot["d5 H1.4"] and hot["d5 N4 H1 PH1"] < 0.5 * hot["d5 H1.72"]  # off-state buys hot
+    assert hot["d5 P4 H1"] > hot["d5 H1"] and worst["d5 N4"] > worst["d5 H1"]
+    area = {d: float(a) for d, a in t["added area (um2)"].items() if a != "ideal"}
+    assert abs(area["d5 H1.4"] - area["d5 N4 H1"]) < 0.05 and abs(area["d5 H1.72"] - area["d5 N4 H1 PH1"]) < 0.05
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]

@@ -81,7 +81,8 @@ EXTENSION_SUMMARY = (
     "(r26h) reproduces the stronger driver's higher loss per mV of dip at TT and the hot corners, so it follows "
     "from the dip's shape rather than the MOS device; the remaining MOS difference comes from the off gates (strong "
     "NMOS pull-down, depleted MOS hold capacitor), which a state-aware linear driver reproduces within 0.08 "
-    "percentage points, and a linear hold capacitor halves the SF / FF loss without changing the 2.5% worst corner.")
+    "percentage points. A 4× decoder pull-down (r26i) then cuts the hot-corner loss 3–7× and the worst corner from "
+    "2.50% to 2.09%, but at equal area a larger nfet hold capacitor still gives the lower worst corner (1.82%).")
 
 
 def sha(path):

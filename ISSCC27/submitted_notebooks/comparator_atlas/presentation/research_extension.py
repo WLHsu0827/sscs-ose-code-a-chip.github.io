@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "de603c5edcdb5a3caaa095839bc5c20ab391d8a81d3ef2359b004110180a600e"
+MANIFEST_SHA256 = "e4ae83f6ddd1b66c0c5a39231f63cd7e672b380659e218e9dcb653036c2cd0f2"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -1179,6 +1179,26 @@ def thevenin_state_table() -> pd.DataFrame:
                     "H1 loss: R_off only / C_off only": f"{h['loss_r_off_only_pct']:.2f} / {h['loss_c_off_only_pct']:.2f}",
                     lin: f"{lc['seg_dip_mv']:.0f} / {lc['loss_pct']:.2f}"})
     return pd.DataFrame(out).set_index("condition")
+
+
+FIXES = "r26i/fixes_k175.json"
+
+
+def fixes_table() -> pd.DataFrame:
+    """r26i: segment-gate dip (mV) / segment-span loss (%) at the five conditions and the worst loss for d5 variants
+    (N<m> / P<m>: decoder output-stage pull-down / pull-up multiplied by m, H<h>: h x h um nfet hold capacitor,
+    PH<p>: p x p um pfet hold capacitor), with their added gate area per segment gate; written by r26i_drv.py table."""
+    data = _json(FIXES)
+    if [tuple(c) for c in data["conds"]] != list(BIT_WEIGHT_CONDS):
+        raise RuntimeError("r26i fixes do not cover the five DNL conditions")
+    out = []
+    for lab, d in data["designs"].items():
+        row = {"design": lab, "added area (um2)": "ideal" if d["area_um2"] is None else f"{d['area_um2']:.2f}"}
+        for r in d["rows"]:
+            row[f"{_condition(r['cond'])} dip / loss"] = f"{r['seg_dip_mv']:.0f} / {r['seg_loss_pct']:.2f}"
+        row["worst loss (%)"] = round(d["worst_loss_pct"], 2)
+        out.append(row)
+    return pd.DataFrame(out).set_index("design")
 
 
 def energy_screen_table(data: dict) -> pd.DataFrame:
