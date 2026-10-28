@@ -1563,6 +1563,32 @@ def main(support_digest: str | None = None) -> None:
         display(ext.driver_fix_table())
         """),
         markdown("""
+        **Why a strong driver costs more per mV (r26h).** To separate the
+        gate waveform from the MOS driver, each ideal segment source is put
+        behind a linear Thevenin driver: a series resistor, optionally with
+        a shunt capacitor to ground, with no junction capacitance and no
+        nonlinearity. Eight (R, C) points span TT dips of 41–213 mV. The
+        peak dip does not set the loss: at TT a 1 kΩ resistor (64 mV dip)
+        loses 4.32% of the segment span, 7 kΩ with 20 fF (68 mV) only
+        1.40%. The fast dip of a resistive driver, aligned with the clock
+        edge, costs 0.043–0.068% per mV at TT and 0.024–0.060 at SF and FF;
+        the slower capacitive-divider dip costs 0.018–0.032 and at most
+        0.009. The linear driver therefore reproduces r26g's finding that
+        the stronger driver loses more per mV: it follows from the dip's
+        shape, not from the MOS device, and it is why the hold capacitor,
+        which slows the dip, is the cheaper fix. At SS and FS every linear
+        driver costs 0.038–0.050% per mV and the scaled MOS drivers lie in
+        that band; there the slow CMOS decoder, with or without hold
+        capacitors, loses 8–21% less than the lowest linear driver. A 7 kΩ
+        + 10 fF driver and the decoder with 1 µm hold capacitors have the
+        same TT dip (103 mV) and loss within 8%, but differ by up to 2.4× at
+        the hot corners, so a second-order device effect remains that the
+        linear model bounds but does not identify.
+        """),
+        code("""
+        display(ext.thevenin_table())
+        """),
+        markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
         bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
         The cost paragraph above refers to the r13 fix. The 6-bit designs have
@@ -1616,9 +1642,10 @@ def main(support_digest: str | None = None) -> None:
         the oxide capacitance (8.4 fF/µm²), and its Monte Carlo has 200 seeds
         per condition. The r26g buffers, scaled drivers and hold capacitors
         are nominal, without Monte Carlo or energy; they are compared by
-        boundaries at codes 0, ±3, ±28 and ±31, not full transfers, and the
-        growth of the loss per mV with driver strength is measured, not
-        modelled.
+        boundaries at codes 0, ±3, ±28 and ±31, not full transfers. The
+        r26h Thevenin drivers are ideal linear elements at eight nominal
+        (R, C) points, and one segment gate's waveform stands for all
+        fourteen.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1658,7 +1685,9 @@ def main(support_digest: str | None = None) -> None:
         and 1000/1000 paired seeds still pass. r26g reduces the kickback to
         one capacitive-divider law across switch sizes, drivers and hold
         capacitors, and finds the hold capacitor about 3× more
-        area-efficient than scaling the switch drivers.
+        area-efficient than scaling the switch drivers; r26h shows with a
+        linear driver that this follows from the shape of the dip, not from
+        the MOS device.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

@@ -77,7 +77,9 @@ EXTENSION_SUMMARY = (
     "segments 1.5–4.7% (a 4 µm MOS hold capacitor per segment gate removes it), and on 200 paired seeds "
     "at each of the five conditions it still passes 1000/1000, as the ideal decoder does. The kickback follows "
     "one capacitive-divider law over switch sizes, drivers and hold capacitors (r26g, within 8%), and a hold "
-    "capacitor is about 3× more area-efficient than scaling the switch drivers.")
+    "capacitor is about 3× more area-efficient than scaling the switch drivers. A linear series-R / shunt-C driver "
+    "(r26h) reproduces the stronger driver's higher loss per mV of dip at TT and the hot corners, so it follows "
+    "from the dip's shape rather than the MOS device.")
 
 
 def sha(path):

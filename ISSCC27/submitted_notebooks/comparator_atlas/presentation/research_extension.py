@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "bbfce9c37aed6e1dd8a0c01bdf251b8437be2d7c148687ecfe808b7ea8413f49"
+MANIFEST_SHA256 = "035915f096fcb93e1a4cc0affce2b856644b45bb68f207979ec1bd048ee895a3"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -1112,6 +1112,42 @@ def driver_fix_table() -> pd.DataFrame:
             row[f"{_condition(r['cond'])} segment / full loss (%)"] = loss
         rows.append(row)
     return pd.DataFrame(rows).set_index("design")
+
+
+THEVENIN = "r26h/thevenin_k175.json"
+THEVENIN_MOS = {"d5": "MOS: CMOS decoder (r26g)", "s5": "MOS: scaled drivers (r26g)",
+                "d5 H1": "MOS: decoder + 1 um hold caps (r26g)"}
+
+
+def thevenin_table() -> pd.DataFrame:
+    """r26h: segment-gate dip (mV), segment-span loss (%) and loss per mV of dip (%/mV) at the five conditions for
+    ideal segment sources behind a linear series R (and shunt C to VSS), next to three r26g MOS designs; boundaries
+    bisected to 0.01 mV, loss of the segment span (codes +/-28) against the ideal decoder."""
+    data = _json(THEVENIN)
+    conds = list(BIT_WEIGHT_CONDS)
+    pts = data["points"]
+    drivers = sorted({(p["c_ff"] > 0, p["r_ohm"], p["c_ff"]) for p in pts})
+    if len(drivers) != 8 or len(pts) != 8 * len(conds) or {tuple(p["cond"]) for p in pts} != set(conds):
+        raise RuntimeError("r26h Thevenin sweep does not cover eight drivers at the five DNL conditions")
+
+    def cell(dip, loss):
+        return f"{dip:.0f} / {loss:.2f} / {loss / dip:.3f}"
+
+    rows = []
+    for _, r_ohm, c_ff in drivers:
+        name = f"linear: R {r_ohm / 1000:g} kohm" + (f" + C {c_ff:g} fF" if c_ff else "")
+        row = {"driver": name}
+        for c in conds:
+            p = next(p for p in pts if (p["r_ohm"], p["c_ff"], tuple(p["cond"])) == (r_ohm, c_ff, c))
+            row[f"{_condition(c)} dip / loss / per mV"] = cell(p["seg_dip_mv"], p["seg_loss_pct"])
+        rows.append(row)
+    for key, name in THEVENIN_MOS.items():
+        row = {"driver": name}
+        for c in conds:
+            d = data["mos"]["|".join(map(str, c))][key]
+            row[f"{_condition(c)} dip / loss / per mV"] = cell(d["seg_dip_mv"], d["seg_loss_pct"])
+        rows.append(row)
+    return pd.DataFrame(rows).set_index("driver")
 
 
 def energy_screen_table(data: dict) -> pd.DataFrame:

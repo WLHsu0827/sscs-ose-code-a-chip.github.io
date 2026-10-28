@@ -490,6 +490,32 @@ def test_r26g_dip_law_and_driver_fixes():
     assert d5[0] == 4.55 and max(h2) <= 1.25
 
 
+def test_r26h_thevenin_drivers():
+    t = ext.thevenin_table()
+    lin = ["linear: R 1 kohm", "linear: R 2 kohm", "linear: R 4 kohm", "linear: R 7 kohm",
+           "linear: R 2 kohm + C 20 fF", "linear: R 7 kohm + C 10 fF", "linear: R 7 kohm + C 20 fF",
+           "linear: R 7 kohm + C 40 fF"]
+    assert list(t.index) == lin + list(ext.THEVENIN_MOS.values())
+    assert [c.split(" dip")[0] for c in t.columns] == ["TT 1.8 V 27 C", "SS 1.62 V -40 C", "FS 1.62 V -40 C",
+                                                       "SF 1.95 V 125 C", "FF 1.95 V 125 C"]
+    v = {d: [tuple(float(x) for x in t.loc[d, c].split(" / ")) for c in t.columns] for d in t.index}
+    assert v[lin[0]][0][:2] == (64, 4.32) and v[lin[6]][0][:2] == (68, 1.40)
+    assert min(v[d][0][0] for d in lin) == 41 and max(v[d][0][0] for d in lin) == 213
+    r_only, rc = lin[:4], lin[4:]
+    for i in (0, 3, 4):  # TT, SF, FF: every series-R-only driver costs more per mV than every shunt-C driver
+        assert min(v[d][i][2] for d in r_only) > max(v[d][i][2] for d in rc)
+    assert max(v[d][i][2] for d in rc for i in (3, 4)) <= 0.009
+    d5, s5, h1 = (v[ext.THEVENIN_MOS[k]] for k in ("d5", "s5", "d5 H1"))
+    for i in (1, 2):  # SS, FS: linear band 0.038 - 0.050 %/mV, s5 inside, the slow MOS designs below
+        band = [v[d][i][2] for d in lin]
+        assert 0.038 <= min(band) and max(band) <= 0.050 and min(band) <= s5[i][2] <= max(band)
+        assert d5[i][2] < min(band) and h1[i][2] < min(band)
+        assert 0.07 <= 1 - max(d5[i][2], h1[i][2]) / min(band) and 1 - min(d5[i][2], h1[i][2]) / min(band) <= 0.23  # 8 - 21 % before rounding
+    pair = v[lin[5]]
+    assert pair[0][0] == h1[0][0] == 103 and abs(h1[0][1] / pair[0][1] - 1) < 0.08
+    assert 2.0 < max(h1[i][1] / pair[i][1] for i in (3, 4)) < 2.45
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]
