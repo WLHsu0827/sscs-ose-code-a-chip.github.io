@@ -7,6 +7,8 @@ also have its loss, the loss is set by the gate waveform; if not, by the driver 
 
   R26H_R=<ohm> R26H_C=<fF> python -B r26h_thev.py kick     # segment-gate dip + waveform, 5 DNL conditions
   R26H_R=<ohm> R26H_C=<fF> python -B r26h_thev.py probe    # fine boundaries at 0, +/-3, +/-28, +/-31
+  R26H_OFF=<ohm>:<fF> ...                                 # state-aware: off (low) gates get R_off, C_off
+  R26H_COND=<tt|ss|fs|sf|ff> ...                          # one condition only (files tagged _<cond>)
   python -B r26h_thev.py table                             # dip and loss of every h5 point vs d5 / s5 / hold caps
 """
 import json
@@ -21,7 +23,11 @@ OUT_H = R3.HERE / "out" / "r26h"
 OUT_H.mkdir(parents=True, exist_ok=True)
 R_OHM = float(os.environ.get("R26H_R", "0"))
 C_FF = float(os.environ.get("R26H_C", "0"))
-TAG = f"R{R_OHM:g}_C{C_FF:g}"
+COND = os.environ.get("R26H_COND", "")
+OFF = os.environ.get("R26H_OFF", "")  # "<ohm>:<fF>": off (low) gates get their own R and C (state-aware driver)
+R_OFF, C_OFF = (float(x) for x in OFF.split(":")) if OFF else (0.0, 0.0)
+TAG = f"R{R_OHM:g}_C{C_FF:g}" + (f"_off{R_OFF:g}-{C_OFF:g}" if OFF else "") + (f"_{COND}" if COND else "")
+CONDS = [c for c in G.S.DNL_CONDS if not COND or c[0] == COND]
 _BDEC = re.compile(r"^Bdec([pn])(\d) g\1\2 vss ", re.M)
 _is_g0, _ct_g, _check0 = G._is_g, G.circuit_text, G._check_circuit
 
@@ -37,9 +43,19 @@ def circuit_text(design):
 
     def thev(mt):
         s, i = mt.group(1), mt.group(2)
-        extra = f"Rth{s}{i} gi{s}{i} g{s}{i} {R_OHM:.12g}\n"
-        if C_FF:
-            extra += f"Cth{s}{i} g{s}{i} vss {C_FF * 1e-15:.12g}\n"
+        if not OFF:
+            extra = f"Rth{s}{i} gi{s}{i} g{s}{i} {R_OHM:.12g}\n"
+            if C_FF:
+                extra += f"Cth{s}{i} g{s}{i} vss {C_FF * 1e-15:.12g}\n"
+            return extra + f"Bdec{s}{i} gi{s}{i} vss "
+        # state-aware: the ideal decoder output (vdd or 0) selects R; each C sits on a node that is grounded in its
+        # own state and follows the gate otherwise, so it carries no current there
+        on, g = f"(v(gi{s}{i}) > 0.5*v(vdd))", f"v(g{s}{i})"
+        extra = f"Bth{s}{i} gi{s}{i} g{s}{i} I=v(gi{s}{i},g{s}{i})/({on} ? {R_OHM:.12g} : {R_OFF:.12g})\n"
+        for st, c, v_on, v_off in (("on", C_FF, "0", g), ("off", C_OFF, g, "0")):
+            if c:
+                extra += (f"Cth{st}{s}{i} g{s}{i} c{st}{s}{i} {c * 1e-15:.12g}\n"
+                          f"Bc{st}{s}{i} c{st}{s}{i} vss V={on} ? {v_on} : {v_off}\n")
         return extra + f"Bdec{s}{i} gi{s}{i} vss "
 
     text, n = _BDEC.subn(thev, _ct_g(design))
@@ -48,10 +64,10 @@ def circuit_text(design):
 
 
 def _check_circuit(text):
-    if "Rth" not in text:
+    if "Rth" not in text and "Bth" not in text:
         return _check0(text)
-    assert text.count("Bdec") == 14 and len(re.findall(r"^Rth[pn]\d ", text, re.M)) == 14
-    assert len(re.findall(r"^Cth[pn]\d ", text, re.M)) == (14 if C_FF else 0)
+    assert text.count("Bdec") == 14 and len(re.findall(r"^[RB]th[pn]\d ", text, re.M)) == 14
+    assert len(re.findall(r"^Cth(?:on|off)?[pn]\d ", text, re.M)) == 14 * ((C_FF > 0) + (C_OFF > 0))
     assert not re.search(r"^Xdc|^Xlb|^Xhc", text, re.M)
     assert re.search(r"Xeq_8 [^\n]*\n(\+[^\n]*\n){3}\+ m=4", text)
 
@@ -65,7 +81,7 @@ for _p in "gdbs":
 
 
 def kick():
-    conds = list(G.S.DNL_CONDS)
+    conds = list(CONDS)
     with ProcessPoolExecutor(len(conds)) as ex:
         rows = list(ex.map(B._kick, [(c, DESIGN) for c in conds]))
     for r in rows:
@@ -78,7 +94,7 @@ def probe(workers=5):
     part = OUT_H / f"_probe_{TAG}.jsonl"
     done = B._read_jsonl(part)
     have = {tuple(r["cond"]) for r in done}
-    jobs = [(DESIGN, c) for c in G.S.DNL_CONDS if tuple(c) not in have]
+    jobs = [(DESIGN, c) for c in CONDS if tuple(c) not in have]
     with ProcessPoolExecutor(workers) as ex, part.open("a") as fh:
         for r in ex.map(B._probe, jobs):
             r.update(r_ohm=R_OHM, c_ff=C_FF)
@@ -105,6 +121,8 @@ def table():
     rows = []
     for p in sorted(OUT_H.glob("probe_R*_C*.json")):
         tag = p.stem[len("probe_"):]
+        if tag.count("_") > 1:
+            continue
         kick_rows = {tuple(r["cond"]): r for r in json.loads((OUT_H / f"kick_{tag}.json").read_text())}
         for r in json.loads(p.read_text()):
             k = kick_rows[tuple(r["cond"])]

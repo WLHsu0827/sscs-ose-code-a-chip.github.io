@@ -17,7 +17,7 @@ from entry_tools import artifact_path, digest, verify_files
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "results" / "research"
-MANIFEST_SHA256 = "035915f096fcb93e1a4cc0affce2b856644b45bb68f207979ec1bd048ee895a3"
+MANIFEST_SHA256 = "de603c5edcdb5a3caaa095839bc5c20ab391d8a81d3ef2359b004110180a600e"
 ATLAS_DESIGNS = ("baseline", "lvt_base_3b", "lvt_balanced_4b")
 PROSPECTIVE_DESIGNS = ("svt_fast_4b", "lvt_fine_3b", "lvt_fine_4b", "lvt_fast_4b", "lvt_fast_fine_4b", "lvt_wide_5b")
 FIX = "fix_x2_unit5b"
@@ -1148,6 +1148,37 @@ def thevenin_table() -> pd.DataFrame:
             row[f"{_condition(c)} dip / loss / per mV"] = cell(d["seg_dip_mv"], d["seg_loss_pct"])
         rows.append(row)
     return pd.DataFrame(rows).set_index("driver")
+
+
+THEVENIN_STATE = "r26h/thevenin_state_k175.json"
+
+
+def thevenin_state_table() -> pd.DataFrame:
+    """r26h extension: per condition, the linear drivers fitted to the MOS designs at code -31 (on-state R_on / C_on,
+    off-state R_off / C_off) and the segment-span loss (%) of the symmetric (on-gate-matched) and state-aware linear
+    drivers against the MOS design, the H1 controls with only R_off or only C_off changed, and d5 with an ideal
+    linear hold capacitor (segment dip mV / loss %); written by r26h_states.py fit."""
+    data = _json(THEVENIN_STATE)
+    rows = data["rows"]
+    if [tuple(r["cond"]) for r in rows] != list(BIT_WEIGHT_CONDS):
+        raise RuntimeError("r26h state-aware fit does not cover the five DNL conditions")
+    lin = f"d5 + {data['lincap_ff']:g} fF linear: dip (mV) / loss"
+    out = []
+    for r in rows:
+        d, h, lc = r["d5"], r["H1"], r["lincap"]
+        if d["r_off_ohm"] != h["r_off_ohm"]:
+            raise RuntimeError("r26h state-aware fit: d5 and H1 pull-down R differ")
+        out.append({"condition": _condition(r["cond"]),
+                    "R_on / R_off (kohm)": f"{r['r_on_ohm'] / 1000:.1f} / {d['r_off_ohm'] / 1000:.1f}",
+                    "d5 C_on / C_off (fF)": f"{d['c_on_ff']:g} / {d['c_off_ff']:g}",
+                    "H1 C_on / C_off (fF)": f"{h['c_on_ff']:g} / {h['c_off_ff']:g}",
+                    "d5 loss: sym / state / MOS": " / ".join(f"{d[k]:.2f}" for k in
+                                                             ("loss_sym_pct", "loss_state_pct", "loss_mos_pct")),
+                    "H1 loss: sym / state / MOS": " / ".join(f"{h[k]:.2f}" for k in
+                                                             ("loss_sym_pct", "loss_state_pct", "loss_mos_pct")),
+                    "H1 loss: R_off only / C_off only": f"{h['loss_r_off_only_pct']:.2f} / {h['loss_c_off_only_pct']:.2f}",
+                    lin: f"{lc['seg_dip_mv']:.0f} / {lc['loss_pct']:.2f}"})
+    return pd.DataFrame(out).set_index("condition")
 
 
 def energy_screen_table(data: dict) -> pd.DataFrame:

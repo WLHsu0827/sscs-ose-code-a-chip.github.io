@@ -651,7 +651,7 @@ command line.
 | r26e | `r26e_seg.py`, `r26e_carry.py`, `r26e_compare.py`, `r26e_cost.py` (with `r26c_stats.py`) | The k 1.75 trim with three thermometer MSBs (seven 4-cell segments, ideal decoder) and two binary LSBs (`g5_k175`): transfer, 200-seed MC at the five conditions on the same seeds, energy and memory; step spread by switched cells and steps above 2 mV against the r26d law |
 | r26f | `r26f_tail.py`, `r26f_dec.py`, `r26f_kick.py` | Exact-likelihood step model (length bias, grid quantization, carry drift per switched cell) fitted on `e5_k175` and `g5_k175` and cross-predicting their steps above 2 mV; `g5_k175` with a transistor-level thermometer decoder (`d5_k175`): decoder leakage at three channel lengths over 45 conditions, transfer, segment-gate kickback at the clock edge, a hold-capacitor sweep, energy, and 200-seed paired MC at the five conditions against the ideal decoder |
 | r26g | `r26g_drv.py` (with `r26f_dec.py`) | `d5_k175` with the two binary LSB switches buffered like the decoder outputs (`b5_k175`) and with every switch driver scaled with its switch (`s5_k175`): segment- and LSB-gate kickback waveforms at code -31, boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV for the ideal decoder, `d5`, `b5`, `s5` and `d5` with 1, 2 and 4 µm hold capacitors at the five conditions, and the capacitive-divider dip-law fit |
-| r26h | `r26h_thev.py` (with `r26g_drv.py`) | `g5_k175` with each segment source behind a linear series resistor and optional shunt capacitor (`h5_k175`): segment-gate kickback waveforms at code -31 and boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV for eight (R, C) points at the five conditions (plus a 10 Ω kick as a check against the ideal source), tabulated against the r26g MOS designs |
+| r26h | `r26h_thev.py`, `r26h_states.py`, `r26h_lincap.py` (with `r26g_drv.py`) | `g5_k175` with each segment source behind a linear series resistor and optional shunt capacitor (`h5_k175`): segment-gate kickback waveforms at code -31 and boundaries at codes 0, ±3, ±28 and ±31 bisected to 0.01 mV for eight (R, C) points at the five conditions (plus a 10 Ω kick as a check against the ideal source), tabulated against the r26g MOS designs; then all 14 gate states per design at code -31, linear drivers fitted per condition to the MOS on and off gates (symmetric, state-aware with separate on / off R and C, and H1 controls with only the off-state R or C changed) and d5 with an ideal 8.3 fF linear hold capacitor, probed the same way |
 **Re-running.** Live studies use the same project-local ngspice 47 and pinned
 SKY130 models as the full campaign (`node scripts/setup.mjs` on Windows;
 `NGSPICE_EXE` may name another ngspice 47 console). From the entry directory:
@@ -806,5 +806,14 @@ r26h: `r26h_thev.py kick` and `probe` with `R26H_R` (Ω) / `R26H_C` (fF) set to
 1000/0, 2000/0, 4000/0, 7000/0, 2000/20, 7000/10, 7000/20 and 7000/40, then
 `table`, which writes `thevenin_k175.json` from the kick and probe files and
 the r26g dip law without simulation. Each point takes about 5 minutes with 5
-workers; the per-run `_probe_*.jsonl` logs are not archived.
+workers; the per-run `_probe_*.jsonl` logs are not archived. The state-aware
+extension runs `r26h_states.py` for d5 and (with `R26F_HOLD=1`) d5 H1; per
+condition (`R26H_COND`), `r26h_thev.py kick` at the fitted R_on with
+`R26H_C` = 0 and 10, `r26h_states.py` at the fitted (R_on, C_on) with
+`R26H_OFF=<R_off>:0` and `:10`, and `probe` for the symmetric
+(`R26H_R`, `R26H_C`), state-aware (`R26H_OFF=<R_off>:<C_off>`) and H1 R_off-only /
+C_off-only drivers; then `R26H_LIN=8.3 r26h_lincap.py kick` and `probe`, and
+finally `r26h_states.py fit`, which re-derives every fitted value from these
+files, checks it against the run tags and writes `thevenin_state_k175.json`. A
+single-condition probe takes 3-4 minutes.
 None of these studies is silicon, Linux, Colab or external-human evidence.

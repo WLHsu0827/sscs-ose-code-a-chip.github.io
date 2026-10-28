@@ -1582,11 +1582,37 @@ def main(support_digest: str | None = None) -> None:
         capacitors, loses 8–21% less than the lowest linear driver. A 7 kΩ
         + 10 fF driver and the decoder with 1 µm hold capacitors have the
         same TT dip (103 mV) and loss within 8%, but differ by up to 2.4× at
-        the hot corners, so a second-order device effect remains that the
-        linear model bounds but does not identify.
+        the hot corners, so a second-order effect remains; the next table
+        locates it.
         """),
         code("""
         display(ext.thevenin_table())
+        """),
+        markdown("""
+        **What the linear model missed: the off gates (r26h).** Matching
+        the on gate is not enough: a symmetric linear driver fitted per
+        corner to the MOS on-gate dip reproduces that waveform to 0.3% rms
+        and still misses the loss (decoder at SS 5.78% against 4.42%,
+        1 µm hold capacitors at SF 0.13% against 1.11%). The off (low)
+        segment gates also dip, by 22–103 mV, and the MOS driver is not
+        symmetric: its NMOS pull-down is stronger (3.0–3.4 kΩ against
+        8.0–13.3 kΩ for the pull-up), and the MOS hold capacitor is
+        depleted when its gate is low (4.2–4.3 fF against 10.4–11.6 fF of
+        gate capacitance). A linear driver whose R and C switch with the
+        gate's logic state reproduces all ten MOS losses (two designs, five
+        corners) within 0.08 percentage points. Changing only the off-state
+        R or only the off-state C shows that the two parts interact: the
+        strong pull-down lowers the loss at TT, SS and FS, the depleted
+        capacitor raises it at SF and FF. As a fix test, the decoder with an
+        ideal linear 8.3 fF capacitor per segment gate (the same on-gate dip
+        as the 1 µm MOS capacitor) halves the SF and FF loss (1.11 → 0.48%,
+        1.10 → 0.52%) but leaves the worst corner at 2.48% against 2.50%.
+        A bias-independent hold capacitor therefore helps the hot corners
+        only; the larger MOS capacitors of r26g remain the way to a lower
+        worst case.
+        """),
+        code("""
+        display(ext.thevenin_state_table())
         """),
         markdown("""
         **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
@@ -1643,9 +1669,13 @@ def main(support_digest: str | None = None) -> None:
         per condition. The r26g buffers, scaled drivers and hold capacitors
         are nominal, without Monte Carlo or energy; they are compared by
         boundaries at codes 0, ±3, ±28 and ±31, not full transfers. The
-        r26h Thevenin drivers are ideal linear elements at eight nominal
-        (R, C) points, and one segment gate's waveform stands for all
-        fourteen.
+        r26h Thevenin drivers are ideal linear elements (linear within each
+        gate state in the state-aware fit) at nominal conditions; the
+        eight-point sweep reports one segment gate's waveform for all
+        fourteen, the state-aware drivers are fitted at code −31 only, the
+        path by which an off gate couples into the boundary is not
+        isolated, and the linear hold capacitor is ideal because the pinned
+        PDK checkout has no MIM capacitor model.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1686,8 +1716,10 @@ def main(support_digest: str | None = None) -> None:
         one capacitive-divider law across switch sizes, drivers and hold
         capacitors, and finds the hold capacitor about 3× more
         area-efficient than scaling the switch drivers; r26h shows with a
-        linear driver that this follows from the shape of the dip, not from
-        the MOS device.
+        linear driver that this follows from the shape of the dip, and traces
+        the remaining MOS difference to the off gates' strong pull-down and
+        depleted MOS capacitor; a linear hold capacitor halves the hot-corner
+        loss but not the worst corner.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across

@@ -79,7 +79,9 @@ EXTENSION_SUMMARY = (
     "one capacitive-divider law over switch sizes, drivers and hold capacitors (r26g, within 8%), and a hold "
     "capacitor is about 3× more area-efficient than scaling the switch drivers. A linear series-R / shunt-C driver "
     "(r26h) reproduces the stronger driver's higher loss per mV of dip at TT and the hot corners, so it follows "
-    "from the dip's shape rather than the MOS device.")
+    "from the dip's shape rather than the MOS device; the remaining MOS difference comes from the off gates (strong "
+    "NMOS pull-down, depleted MOS hold capacitor), which a state-aware linear driver reproduces within 0.08 "
+    "percentage points, and a linear hold capacitor halves the SF / FF loss without changing the 2.5% worst corner.")
 
 
 def sha(path):

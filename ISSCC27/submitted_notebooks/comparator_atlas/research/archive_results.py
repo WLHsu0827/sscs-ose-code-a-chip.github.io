@@ -70,7 +70,8 @@ STUDIES = {
              "r26b/memory_energy_g5_k175.json", "r26e/carry_*.json", "r26e/compare_g5_k175.json"],
     "r26f": ["r26b/dnl_d5_k175.json", "r26b/memory_energy_d5_k175.json", "r26f/*.json"],
     "r26g": ["r26g/kick_*.json", "r26g/probe_drivers_*.json", "r26g/dip_law_*.json"],
-    "r26h": ["r26h/kick_R*_C*.json", "r26h/probe_R*_C*.json", "r26h/thevenin_*.json"],
+    "r26h": ["r26h/kick_R*_C*.json", "r26h/probe_R*_C*.json", "r26h/thevenin_*.json", "r26h/states_*.json",
+             "r26h/kick_d5_lin*.json", "r26h/probe_d5_lin*.json"],
 }
 # r26c extends the r26b MC files to 200 seeds; r26b keeps its 40 (r26c archives a per-seed summary instead).
 SEED_LIMIT = {"r26b": 40}

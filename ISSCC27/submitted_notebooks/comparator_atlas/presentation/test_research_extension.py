@@ -516,6 +516,30 @@ def test_r26h_thevenin_drivers():
     assert 2.0 < max(h1[i][1] / pair[i][1] for i in (3, 4)) < 2.45
 
 
+def test_r26h_state_aware_fit():
+    t = ext.thevenin_state_table()
+    assert list(t.index) == [ext._condition(c) for c in ext.BIT_WEIGHT_CONDS]
+    lin = "d5 + 8.3 fF linear: dip (mV) / loss"
+    assert list(t.columns)[-1] == lin
+
+    def num(col):
+        return [[float(x) for x in s.split(" / ")] for s in t[col]]
+    d5, h1 = num("d5 loss: sym / state / MOS"), num("H1 loss: sym / state / MOS")
+    for sym, state, mos in d5 + h1:  # the state-aware driver reproduces all ten MOS losses
+        assert abs(state - mos) <= 0.08
+    assert max(abs(sym - mos) for sym, _, mos in d5 + h1) > 0.9  # the on-gate-matched symmetric driver does not
+    r_off = [r for r, _ in num("R_on / R_off (kohm)")]
+    assert min(r_off) >= 8.0 and max(r_off) <= 13.3
+    assert all(3.0 <= r <= 3.4 for _, r in num("R_on / R_off (kohm)"))
+    assert all(c_off < 0.5 * c_on for c_on, c_off in num("H1 C_on / C_off (fF)"))
+    fix = num(lin)
+    for (_, loss), (_, _, mos) in zip(fix[3:], h1[3:]):  # SF, FF: a linear hold capacitor halves the loss
+        assert loss < 0.6 and loss < 0.5 * mos
+    for (_, loss), (_, _, mos) in zip(fix[:3], h1[:3]):  # TT, SS, FS: within 8 %
+        assert abs(loss / mos - 1) <= 0.08
+    assert abs(max(x[1] for x in fix) - max(x[2] for x in h1)) < 0.05  # worst corner unchanged
+
+
 def test_no_unfilled_placeholders():
     texts = [(ROOT / n).read_text(encoding="utf-8") for n in
              ("Comparator_Atlas.ipynb", "README.md", "REVIEWER_GUIDE.md", "REPRODUCIBILITY.md")]
