@@ -565,7 +565,9 @@ def test_r26j_verify():
     assert list(t.index) == ["d5", "d5 H1", "d5 H1.4", "d5 H1.72", "d5 N4 H1", "d5 H1 PH1", "d5 N4 H1 PH1"]
     assert len(data["seeds"]) == 20
     assert all(max(v["mc"]["sd_pct"]) < 0.15 for v in d.values())  # mismatch barely moves the segment loss
-    assert all(abs(sum(v["mc"]["per_seed_worst_pct"]) / 20 - v["nominal_worst_pct"]) < 0.1 for v in d.values())
+    assert all(abs(sum(v["mc"]["per_seed_worst_pct"]) / 20 - v["nominal_worst_pct"]) < 0.08 for v in d.values())
+    dev = {k: max(abs(a - b) for a, b in zip(v["mc"]["mean_pct"], v["nominal_loss_pct"])) for k, v in d.items()}
+    assert max(dev.values()) < 0.16 and max(dev, key=dev.get) == "d5 N4 H1 PH1"  # text: within 0.16, N4/PH most
     assert all(p["seeds"] == p["n"] == 20 for p in data["worst_rank_pairs"].values())  # r26i's ranking, every seed
     assert all(v["energy"]["tt_vdd_delta_fj"] < 0.5 for v in d.values())
     ref = ext._json("r26f/memory_energy_d5_k175.json")  # r26f's d5 energy, reproduced by the r26j path

@@ -4,7 +4,7 @@ R26I_PH, R26F_HOLD); R26J_REF=1 selects the ideal-source reference g5_k175 inste
 
   [env] python -B r26j_verify.py mcloss [n_seeds] [workers]  # paired-seed b(+/-28) at the 5 DNL conditions vs g5
   [env] python -B r26j_verify.py mcflow [n_seeds] [workers]  # r26f calibration MC (code, residual, 1 mV / 1 ns)
-  [env] python -B r26j_verify.py para [workers]              # nominal b(+/-28) with b1 bit-2 gate-net caps x 0/1/2/4
+  [env] python -B r26j_verify.py para [workers]              # nominal b(+/-28) with b1 bit-2 gate-net caps x 1/4
   [env] python -B r26j_verify.py energy                      # TT energy per decision (codes 0, +/-31), leakage
   python -B r26j_verify.py table                             # writes out/r26j/verify_k175.json
 

@@ -1471,6 +1471,33 @@ def main(support_digest: str | None = None) -> None:
         1000 against 999 passing seeds does not resolve the predicted
         0.07 against 0.73 static misses per 1000; that needs about 10⁴
         seeds.
+
+        **The segmented trim as a system (r26e–r26j).** One side is shown; the
+        other is identical. The decoder and its gate dip are the subject of
+        r26f–r26j below.
+
+        ```text
+        trim code c, one side (sign + 5 magnitude bits, set by calibration)
+          |
+          +-- 2 LSBs ---------------------------------------> LSB switches (2 + 1 cells) --+
+          |                                                                               |
+          +-- 3 MSBs --> thermometer --> 7 segment gates --> 7 segment switches ----------+
+                         decoder         (+ hold capacitor)   (4 unit cells each)         |
+                         (CMOS, r26f;          ^                                          v
+                         4x pull-down r26i)    |               auxiliary input NFETs (gate vinp
+                                               |               or vinn, drain xp or xn) add the
+             clock edge: the falling tail -----+               trim current to the core
+             kicks each segment gate ("dip")
+        ```
+
+        - **Decoder:** turns the 3 MSBs into 7 equal-weight segment-gate levels,
+          so a code step switches at most 7 cells instead of 31.
+        - **Segment gate and hold capacitor:** the gate node holds the decoded
+          level; at the clock edge the tail couples a dip onto it through the
+          switch, which weakens the segment (the "loss"). A hold capacitor or a
+          stronger decoder pull-down reduces the dip.
+        - **Switches and auxiliary pair:** each enabled cell adds a unit of
+          trim current on its side, which cancels the core's offset.
         """),
         code("""
         sg = ext.segmented_mc_table(extension)
@@ -1647,9 +1674,10 @@ def main(support_digest: str | None = None) -> None:
         from a segment gate to vss, s, vin, tail and x) added once and four
         times to all 14 segment gates, and with TT energy per decision and
         decoder leakage. Mismatch barely moves the segment loss (standard
-        deviation at most 0.14 percentage points per condition, means within
-        0.07 of nominal), and every area-matched ranking of r26i holds in all
-        20 seeds: H1.4 stays below N4 H1 by 0.27 ± 0.07 points and below
+        deviation at most 0.14 percentage points per condition, per-condition
+        means within 0.16 of nominal, and the mean per-seed worst corner
+        within 0.07 of the nominal worst corner), and without the gate net
+        every area-matched ranking of r26i holds in all 20 seeds: H1.4 stays below N4 H1 by 0.27 ± 0.07 points and below
         H1 PH1 by 0.36, H1.72 below N4 + PH1 by 0.33, and N4 H1 below H1 by
         0.35. No fix changes TT energy by more than 0.18 fJ out of 451 fJ per
         decision, because the hold capacitors are charged only when a code
@@ -1657,9 +1685,10 @@ def main(support_digest: str | None = None) -> None:
         N4 raises the worst decoder leakage from 2.93 to 4.10 nA (SF,
         1.95 V, 125 C). Layout coupling is where the two fixes part. With the
         extracted gate net, the capacitor-only design loses ground (H1.4
-        1.82% → 2.00%) while N4 H1 improves (2.09% → 2.01%): the strong
-        pull-down holds the off gates against the coupling, and the
-        capacitance to vss then acts as extra hold. At four times the
+        1.82% → 2.00%) while N4 H1 improves (2.09% → 2.01%), so the
+        area-matched pair ties. This is consistent with the strong pull-down
+        holding the off gates against the coupling, so that the capacitance
+        to vss acts as extra hold; that path was not isolated. At four times the
         extracted capacitance N4 H1 reaches 1.77% against 2.20% for H1.4 and
         1.92% for H1.72. A footprint estimated from SKY130 rules (each extra
         finger or capacitor with its contacted diffusion and half spacing)
@@ -1676,74 +1705,88 @@ def main(support_digest: str | None = None) -> None:
         display(ext.verify_table())
         """),
         markdown("""
-        **Limits.** Only Vth mismatch is modelled, and |*m*| is found by
-        bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
-        The cost paragraph above refers to the r13 fix. The 6-bit designs have
-        no layout, DRC/LVS or extraction of their own; their RC numbers are
-        estimates at code 0 without mismatch, their mismatch Monte Carlo
-        covers two conditions without width skew, and their 49-condition
-        tests use deterministic width skews, not random mismatch. The r18
-        screen is nominal TT only, and `u6_w12_l05` was chosen after seeing
-        it; its own sealed test covers only that one design. Under the binned
-        models the atlas width skews are not design-neutral (r20); r21 reruns
-        only the three sealed designs with an exact current skew, and for the
-        6-bit designs only their untrimmed offsets. The r22 Monte Carlo adds
-        two hot corners for the selected design and one for `lvt_base_3b`.
-        The r23 noise model has no flicker or induced gate noise. σn is
-        measured at trim code 0 on nominal devices, so noise from switched-on
-        trim branches at the calibrated code is not included, and it is
-        combined with the Monte Carlo residuals under a Gaussian assumption
-        that 40 realizations cannot check at 10⁻⁶. The r24 ISF shares the r23
-        noise model and its linearity; its atlas, common-mode and closed-form
-        results use the pinned bench. The gain law's A0 is fitted on the same
-        45 conditions it is scored on (held-out corners move it by <1%), and
-        the common-mode sweep is one TT condition, not requalified for
-        offset, trim or kickback. The memory probe uses ideal switches. The
-        equalizer and precharge devices are nominal schematic devices with
-        no layout, mismatch or noise of their own in the ISF; the 6-bit
-        designs get only a spot check at three conditions, and the paired
-        fix Monte Carlo covers the selected design at its two hot corners.
-        The r25 5-bit trim is likewise schematic only; its length screen is
-        three conditions, its full transfer five, and its Monte Carlo the
-        two hot corners and TT. The same holds for the r26 and r26b trims;
-        the unit cells have no layout, so gradient or proximity mismatch
-        among the 2^k cells of a bit is not modelled. In r26c the equalizer
-        and inverter devices are nominal, the inverter size was chosen after
-        its sweep on nominal transfers, the 1 ns runs use the code from a
-        0.2 mV bisection, and 200 seeds per condition bound a rate only to
-        about 2%. The r26d step law is fitted on the coarse bisection
-        candidates with few 4-bit carries (87 and 100 seeds), assumes
-        Gaussian steps and a residual uniform within a step, and its
-        segmented codings are predictions, not simulations; at k 1.75 the
-        smallest nominal half range (24.9 mV) is close to the largest cold
-        |b0| at 200 seeds (25.7 mV), so a larger k needs a cold Monte
-        Carlo with more seeds first. The r26e thermometer decoder is an
-        ideal behavioural source with no energy, delay or mismatch, and each
-        4-cell segment is one device with the mismatch of four parallel
-        cells. The r26f tail model is fitted on 13 steps above 2 mV, its
-        drift is a phenomenological term linear in the switched cells, and
-        it assumes a residual uniform within a step. The r26f decoder has
-        nominal sizing, swept only in channel length; there is no layout,
-        so the gate node has no wiring capacitance; the hold capacitor's
-        energy and Monte Carlo were not simulated, the divider fit assumes
-        the oxide capacitance (8.4 fF/µm²), and its Monte Carlo has 200 seeds
-        per condition. The r26g buffers, scaled drivers and hold capacitors
-        are nominal, without Monte Carlo or energy; they are compared by
-        boundaries at codes 0, ±3, ±28 and ±31, not full transfers. The
-        r26h Thevenin drivers are ideal linear elements (linear within each
-        gate state in the state-aware fit) at nominal conditions; the
-        eight-point sweep reports one segment gate's waveform for all
-        fourteen, the state-aware drivers are fitted at code −31 only, the
-        path by which an off gate couples into the boundary is not
-        isolated, and the linear hold capacitor is ideal because the pinned
-        PDK checkout has no MIM capacitor model. The r26i variants are
-        nominal ten-design comparisons with gate area only. r26j's 20 seeds
-        are not a yield estimate, and one mismatch draw covers all four
-        fingers of the N4 device; its gate net is the b1 bit-2 extraction
-        scaled by 1 and 4 for every segment at nominal conditions, not a
-        routed layout; its footprint is a design-rule estimate, not a drawn
-        cell; its calibration Monte Carlo covers H1.4 and N4 H1 only; and
-        the leakage models have no gate tunnelling.
+        **Limits.**
+
+        - **Common.** Only Vth mismatch is modelled, and |*m*| is found by
+          bisection to 0.2 mV; 40 seeds per condition are not a yield estimate.
+          The cost paragraph above refers to the r13 fix.
+        - **6-bit designs (r15–r19).** They have no layout, DRC/LVS or extraction
+          of their own; their RC numbers are estimates at code 0 without mismatch,
+          their mismatch Monte Carlo covers two conditions without width skew, and
+          their 49-condition tests use deterministic width skews, not random
+          mismatch. The r18 screen is nominal TT only, and `u6_w12_l05` was chosen
+          after seeing it; its own sealed test covers only that one design.
+        - **Width skew and hot corners (r20–r22).** Under the binned models the
+          atlas width skews are not design-neutral (r20); r21 reruns only the three
+          sealed designs with an exact current skew, and for the 6-bit designs only
+          their untrimmed offsets. The r22 Monte Carlo adds two hot corners for the
+          selected design and one for `lvt_base_3b`.
+        - **Noise (r23, r24).** The r23 noise model has no flicker or induced gate
+          noise. σn is measured at trim code 0 on nominal devices, so noise from
+          switched-on trim branches at the calibrated code is not included, and it
+          is combined with the Monte Carlo residuals under a Gaussian assumption
+          that 40 realizations cannot check at 10⁻⁶. The r24 ISF shares the r23
+          noise model and its linearity; its atlas, common-mode and closed-form
+          results use the pinned bench. The gain law's A0 is fitted on the same
+          45 conditions it is scored on (held-out corners move it by <1%), and the
+          common-mode sweep is one TT condition, not requalified for offset, trim
+          or kickback.
+        - **Memory and equalizer (r24c, r25).** The memory probe uses ideal
+          switches. The equalizer and precharge devices are nominal schematic
+          devices with no layout, mismatch or noise of their own in the ISF; the
+          6-bit designs get only a spot check at three conditions, and the paired
+          fix Monte Carlo covers the selected design at its two hot corners. The
+          r25 5-bit trim is likewise schematic only; its length screen is three
+          conditions, its full transfer five, and its Monte Carlo the two hot
+          corners and TT.
+        - **Unit-cell trims (r26–r26d).** The same holds for the r26 and r26b
+          trims; the unit cells have no layout, so gradient or proximity mismatch
+          among the 2^k cells of a bit is not modelled. In r26c the equalizer and
+          inverter devices are nominal, the inverter size was chosen after its
+          sweep on nominal transfers, the 1 ns runs use the code from a 0.2 mV
+          bisection, and 200 seeds per condition bound a rate only to about 2%.
+          The r26d step law is fitted on the coarse bisection candidates with few
+          4-bit carries (87 and 100 seeds), assumes Gaussian steps and a residual
+          uniform within a step, and its segmented codings are predictions, not
+          simulations; at k 1.75 the smallest nominal half range (24.9 mV) is
+          close to the largest cold |b0| at 200 seeds (25.7 mV), so a larger k
+          needs a cold Monte Carlo with more seeds first.
+        - **Segmented trim and decoder (r26e, r26f).** The r26e thermometer
+          decoder is an ideal behavioural source with no energy, delay or
+          mismatch, and each 4-cell segment is one device with the mismatch of
+          four parallel cells. The r26f tail model is fitted on 13 steps above
+          2 mV, its drift is a phenomenological term linear in the switched cells,
+          and it assumes a residual uniform within a step. The r26f decoder has
+          nominal sizing, swept only in channel length; there is no layout, so the
+          gate node has no wiring capacitance; the hold capacitor's energy and
+          Monte Carlo were not simulated, the divider fit assumes the oxide
+          capacitance (8.4 fF/µm²), and its Monte Carlo has 200 seeds per
+          condition.
+        - **Kickback studies (r26g–r26i).** The r26g buffers, scaled drivers and
+          hold capacitors are nominal, without Monte Carlo or energy; they are
+          compared by boundaries at codes 0, ±3, ±28 and ±31, not full transfers.
+          The r26h Thevenin drivers are ideal linear elements (linear within each
+          gate state in the state-aware fit) at nominal conditions; the
+          eight-point sweep reports one segment gate's waveform for all fourteen,
+          the state-aware drivers are fitted at code −31 only, the path by which
+          an off gate couples into the boundary is not isolated, and the linear
+          hold capacitor is ideal because the pinned PDK checkout has no MIM
+          capacitor model. The r26i variants are nominal ten-design comparisons
+          with gate area only.
+        - **Fix verification (r26j).** Its 20 seeds are not a yield estimate, and
+          the loss is measured from the ±28 boundaries only. Each seed's worst
+          corner is the maximum over five conditions, and the worst condition can
+          change from seed to seed. One mismatch draw with an undivided sigma
+          covers all four fingers of the N4 device, which is conservative for N4;
+          the N4 and PH designs' per-condition means move most (up to 0.15
+          points), but the paired H1.4 − N4 H1 difference (−0.27 points) equals
+          the nominal one. Its gate net is the b1 bit-2 extraction scaled by 1 and
+          4 for every segment at nominal conditions, not a routed layout, and a
+          larger hold capacitor would probably add wiring capacitance of its own;
+          with the net a segment can beat the ideal reference, so a negative loss
+          is counted by its magnitude. Its footprint is a design-rule estimate,
+          not a drawn cell; its calibration Monte Carlo covers H1.4 and N4 H1
+          only; and the leakage models have no gate tunnelling.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1789,9 +1832,10 @@ def main(support_digest: str | None = None) -> None:
         depleted MOS capacitor; r26i turns this into a cheap pull-down fix
         for the hot corners, while a larger nfet hold capacitor remains the
         most area-efficient fix for the worst corner. r26j keeps these
-        rankings in all 20 Monte Carlo seeds at no measurable energy cost,
-        and finds the pull-down gaining value once the gate net couples more
-        strongly than the b1 extraction.
+        rankings in all 20 Monte Carlo seeds at no measurable energy cost
+        (nominal gate net); with the extracted gate net the two fixes tie,
+        and the pull-down gains once the net couples more strongly than the
+        b1 extraction.
 
         Under the same local calibration policy, the selected circuit
         increases 1 ns correct decisions from 310/392 to 372/392 across
