@@ -118,7 +118,7 @@ EXTENSION_SUMMARY = (
     "rather than the MOS device; the remaining MOS difference comes from the off gates, which a state-aware "
     "linear driver reproduces within 0.08 percentage points. A 4× decoder pull-down cuts the hot-corner loss "
     "3–7× and the worst corner from 2.50% to 2.09%, but at equal gate area a larger nfet hold capacitor gives "
-    "the lower worst corner (1.82%). In 20-seed Monte Carlo (r26j) these rankings hold in 20 of 20 seeds with no "
+    "the lower worst corner (1.82%). In 40-seed Monte Carlo (r26j) these rankings hold in 40 of 40 seeds, every fix calibrates to ±1 mV, with no "
     "measurable energy cost; with the extracted gate-net coupling the two fixes tie (2.00% and 2.01%), and at "
     "four times that coupling the pull-down is the better fix (1.77% against 2.20%).")
 

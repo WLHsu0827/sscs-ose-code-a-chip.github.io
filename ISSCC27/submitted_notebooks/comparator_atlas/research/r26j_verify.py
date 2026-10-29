@@ -3,6 +3,7 @@ gate-route parasitics and a DRC-rule footprint. Each variant is configured as in
 R26I_PH, R26F_HOLD); R26J_REF=1 selects the ideal-source reference g5_k175 instead (mcloss and para only).
 
   [env] python -B r26j_verify.py mcloss [n_seeds] [workers]  # paired-seed b(+/-28) at the 5 DNL conditions vs g5
+                                                             # (40 seeds; R26J_SEEDS sets the table's count)
   [env] python -B r26j_verify.py mcflow [n_seeds] [workers]  # r26f calibration MC (code, residual, 1 mV / 1 ns)
   [env] python -B r26j_verify.py para [workers]              # nominal b(+/-28) with b1 bit-2 gate-net caps x 1/4
   [env] python -B r26j_verify.py energy                      # TT energy per decision (codes 0, +/-31), leakage
@@ -219,6 +220,7 @@ def footprint_um2(mn, mp, h, ph):
 VARIANTS = ((1, 1, 0, 0), (1, 1, 1, 0), (1, 1, 1.4, 0), (1, 1, 1.72, 0), (4, 1, 1, 0), (1, 1, 1, 1), (4, 1, 1, 1))
 
 
+N_FLOW = 20
 PAIRS = (("d5 H1.4", "d5 N4 H1"), ("d5 H1.4", "d5 H1 PH1"), ("d5 H1.72", "d5 N4 H1 PH1"), ("d5 N4 H1", "d5 H1"))
 
 
@@ -244,7 +246,7 @@ def table():
     done = [{(r["seed"], tuple(r["cond"])) for r in _read_jsonl(OUT_J / f"_mcloss_{_tag(*v)}.jsonl")} for v in VARIANTS]
     seeds = sorted(s for s in {s for s, _ in gref}
                    if all((s, tuple(c)) in d for d in [set(gref)] + done for c in conds))
-    n_mc = int(os.environ.get("R26J_SEEDS", "20"))
+    n_mc = int(os.environ.get("R26J_SEEDS", "40"))
     assert seeds[:n_mc] == list(range(n_mc)), seeds
     seeds = seeds[:n_mc]
     flow_d5 = {}
@@ -286,10 +288,13 @@ def table():
         flow = []
         for c in conds:
             p = OUT_J / f"mc_{c[0]}{c[1]:g}V{c[2]:g}C_{tag}.jsonl"
-            if not p.exists():
-                continue
-            rd = {r["seed"]: r for r in _read_jsonl(p)}
             ref = flow_d5[tuple(c)]
+            if v == VARIANTS[0]:  # d5 itself: r26b's calibration Monte Carlo on the same seeds
+                rd = {s: ref[s] for s in range(N_FLOW)}
+            elif p.exists():
+                rd = {r["seed"]: r for r in _read_jsonl(p)}
+            else:
+                continue
             row = {"cond": c, "n": len(rd), "same_code": 0, "static_1mv": 0, "pass_1mv_1ns": 0, "static_1mv_d5": 0,
                    "pass_1mv_1ns_d5": 0, "max_abs_m_mv": 0.0, "max_abs_dm_mv": 0.0}
             for s, a in rd.items():

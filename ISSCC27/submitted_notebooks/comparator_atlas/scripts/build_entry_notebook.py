@@ -1668,18 +1668,18 @@ def main(support_digest: str | None = None) -> None:
         """),
         markdown("""
         **Checking the fixes (r26j).** The r26i variants were nominal. r26j
-        repeats them under Vth-mismatch Monte Carlo (20 seeds at all five
+        repeats them under Vth-mismatch Monte Carlo (40 seeds at all five
         conditions, each design paired with the ideal-decoder reference on
         the same seed), with the b1-extracted gate-net capacitance (1.22 fF
         from a segment gate to vss, s, vin, tail and x) added once and four
         times to all 14 segment gates, and with TT energy per decision and
         decoder leakage. Mismatch barely moves the segment loss (standard
         deviation at most 0.14 percentage points per condition, per-condition
-        means within 0.16 of nominal, and the mean per-seed worst corner
-        within 0.07 of the nominal worst corner), and without the gate net
-        every area-matched ranking of r26i holds in all 20 seeds: H1.4 stays below N4 H1 by 0.27 ± 0.07 points and below
-        H1 PH1 by 0.36, H1.72 below N4 + PH1 by 0.33, and N4 H1 below H1 by
-        0.35. No fix changes TT energy by more than 0.18 fJ out of 451 fJ per
+        means within 0.15 of nominal, and the mean per-seed worst corner
+        within 0.08 of the nominal worst corner), and without the gate net
+        every area-matched ranking of r26i holds in all 40 seeds: H1.4 stays below N4 H1 by 0.27 ± 0.07 points and below
+        H1 PH1 by 0.36, H1.72 below N4 + PH1 by 0.32, and N4 H1 below H1 by
+        0.37. No fix changes TT energy by more than 0.18 fJ out of 451 fJ per
         decision, because the hold capacitors are charged only when a code
         changes (about 53 fJ per toggled 1.4 µm gate, during calibration);
         N4 raises the worst decoder leakage from 2.93 to 4.10 nA (SF,
@@ -1694,8 +1694,9 @@ def main(support_digest: str | None = None) -> None:
         finger or capacitor with its contacted diffusion and half spacing)
         charges N4 more than its gate area: near 5.5 µm² H1.72 gives 1.44%
         (1.55% with the extracted net) against 2.09% (2.01%) for N4 H1. The
-        r26b calibration Monte Carlo, rerun for H1.4 and N4 H1, trims every
-        seed and condition to ±1 mV with a 1 ns decision, as d5 does. The
+        r26b calibration Monte Carlo, rerun for all six fixes (20 seeds at
+        each condition), trims every seed and condition to ±1 mV with a
+        1 ns decision (largest residual 0.82 mV), as d5 does. The
         rule therefore gains one clause: size the nfet hold capacitor for
         the worst corner with the extracted gate net included, and add the
         4× pull-down when the routed gate net couples more strongly than the
@@ -1773,7 +1774,7 @@ def main(support_digest: str | None = None) -> None:
           hold capacitor is ideal because the pinned PDK checkout has no MIM
           capacitor model. The r26i variants are nominal ten-design comparisons
           with gate area only.
-        - **Fix verification (r26j).** Its 20 seeds are not a yield estimate, and
+        - **Fix verification (r26j).** Its 40 seeds are not a yield estimate, and
           the loss is measured from the ±28 boundaries only. Each seed's worst
           corner is the maximum over five conditions, and the worst condition can
           change from seed to seed. One mismatch draw with an undivided sigma
@@ -1785,8 +1786,8 @@ def main(support_digest: str | None = None) -> None:
           larger hold capacitor would probably add wiring capacitance of its own;
           with the net a segment can beat the ideal reference, so a negative loss
           is counted by its magnitude. Its footprint is a design-rule estimate,
-          not a drawn cell; its calibration Monte Carlo covers H1.4 and N4 H1
-          only; and the leakage models have no gate tunnelling.
+          not a drawn cell; its calibration Monte Carlo has 20 seeds per
+          condition; and the leakage models have no gate tunnelling.
         """),
         markdown("""
         ## 10. Discussion and limitations
@@ -1832,7 +1833,7 @@ def main(support_digest: str | None = None) -> None:
         depleted MOS capacitor; r26i turns this into a cheap pull-down fix
         for the hot corners, while a larger nfet hold capacitor remains the
         most area-efficient fix for the worst corner. r26j keeps these
-        rankings in all 20 Monte Carlo seeds at no measurable energy cost
+        rankings in all 40 Monte Carlo seeds at no measurable energy cost
         (nominal gate net); with the extracted gate net the two fixes tie,
         and the pull-down gains once the net couples more strongly than the
         b1 extraction.
