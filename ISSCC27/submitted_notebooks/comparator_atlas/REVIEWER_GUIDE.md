@@ -8,12 +8,11 @@ IEEE SSCS Code-a-Chip - ISSCC 2027 | Original code: MIT
 
 [Notebook](Comparator_Atlas.ipynb) | [Quick tour](REVIEWER_GUIDE.md) | [Reproduction](REPRODUCIBILITY.md) | [Run in Colab](https://colab.research.google.com/github/WLHsu0827/sscs-ose-code-a-chip.github.io/blob/wlhsu0827-comparator-atlas-isscc27/ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb)
 
-Which SKY130 StrongARM comparator meets your sampled input band and deadline?
-Calibration alone does not ensure a correct decision on time. Comparator Atlas lets you
-compare three designs using saved schematic measurements: choose a specification, inspect
-correct, wrong and unresolved outcomes, and trace failures to their exact records.
-Rank mean energy only after every included point qualifies. If none does, return NONE,
-not the best average.
+Which SKY130 StrongARM comparator decides correctly, before the deadline, at every
+sampled condition in your input band? Comparator Atlas compares three calibrated designs on
+saved schematic measurements: choose a band and a deadline, inspect every correct, wrong and
+unresolved decision, and rank energy only among designs with no failure. If none qualifies,
+the answer is NONE, not the best average.
 
 **System at a glance.** Inputs enter at the top; the selector at the bottom returns the answer.
 
@@ -53,16 +52,11 @@ not the best average.
 - **Extension** (Section 9): the residual m explains every wrong decision, so later studies redesign the trim
   (unit cells, a segmented decoder) until ±1 mV qualifies.
 
-**Why NONE at 1 mV? (Section 9, later extension.)** Later schematic studies, kept separate from the sealed record, find the cause and designs that do qualify:
+**Why NONE at 1 mV, and what fixes it (Section 9, a later schematic extension; Sections 1–8 are unchanged).**
 
-- **Cause: the trim, not latch speed.** Every wrong decision lies between zero and the static post-calibration residual offset (303/303, no misses, four observed-correct false positives), and sealed predictions for six new designs matched 97.9% of 10,584 held-out decisions. The binary array's major-carry step limits first; once unit elements remove it, the trim range does (a 5-bit unit trim saturates in 11 of 49 conditions).
-- **Two designs that qualify (r15b, r19).** In the finite 49-condition schematic atlas, two 6-bit unit-trim designs, each tested with sealed predictions, pass ±1 mV (98/98 decisions per deadline): `unit6_w6` (input W = 6 µm) at 1 and 2 ns with 760 fJ mean core energy, and `u6_w12_l05` (input W = 12 µm, half-length trim elements, chosen after an energy screen) at 0.75, 1 and 2 ns with 623 fJ. The shipped design needs a ≥3 mV band and averages 250 fJ there; these are different specifications, not a same-specification energy comparison. Paired mismatch Monte Carlo (40 seeds at each of two conditions; not a yield estimate) keeps the residual within 0.59 mV and 0.82 mV. Neither design has a layout of its own; an RC estimate on the archived extraction keeps ±1 mV correct at 2 ns but not at 1 ns (69/90 and 78/90 at code 0; misses are unresolved, none wrong).
-- **The original selection holds (r20–r22).** The atlas width skew is not design-neutral under the PDK's width-binned models; rerun with an exact 4% current skew, the three-design selection is unchanged. At 1.95 V 125 °C the shipped trim covers 38/40 mismatch seeds; the two ~3σ seeds it misses are also missed by `lvt_base_3b`.
-- **Noise (r23, r24).** With transient thermal noise (white BSIM4 noise, no flicker) the shipped design has 0.71 mV input-referred noise at TT, so its ±1 mV results are noiseless counts rather than low error rates; a 10⁻⁶ error rate needs about 4 mV at TT and 7 mV at SF 1.95 V 125 °C. A measured impulse sensitivity of the decision reproduces those noise runs realization by realization, maps the noise over 45 PVT conditions (0.35–1.21 mV) and shows that it follows the input pair's inversion level, so the input common mode is a noise knob.
-- **Trim memory and range (r24c, r25).** A causal probe traces a 7.5 µV decision memory to the trim's floating nodes; one equalizing switch per bit removes it at 3% energy but does not recover the two hot-corner seeds. A fifth trim bit with the equalizer covers all 40 seeds at both hot corners at 55% more energy, with ±1 mV about unchanged (68 and 71/80), because that is limited by the ~2 mV trim step.
-- **Unit-cell trim (r26b–r26d).** Building each bit from identical unit cells makes the weights binary at every corner; with the input pair widened 1.5×, ±1 mV reaches 240/240 paired decisions at SF, FF and TT for 4.8% more energy than r25. At 200 seeds over five conditions it passes ±1 mV at 1 ns for 978/1000 seeds, losing at the cold corners to the per-bit equalizer kept from r24c; a unit-cell equalizer gives 996/1000 with no unresolved decision (+7.3% energy), and a 1.75× input pair 999/1000 (+3.2%, not statistically resolved). The remaining miss follows a binary carry law, step sd = √(σ0² + (2^j − 1)σu²) with σu ≈ 0.1 mV per unit cell, which predicts that thermometer-coded MSBs would remove it.
-- **Segmented trim with a real decoder (r26e, r26f).** With three thermometer MSBs (ideal decoder) the trim passes 1000/1000 at the same energy and its steps above 2 mV fall 3.3× (3.6× predicted); the steps are Gaussian with a 0.53%-per-cell carry drift. A transistor-level CMOS decoder adds no measurable energy, keeps the transfer monotonic and still passes 1000/1000 on 200 paired seeds at each of the five conditions, but clock-edge gate kickback weakens the segments 1.5–4.7%; a 4 µm MOS hold capacitor per segment gate removes it.
-- **Kickback law and its fixes (r26g–r26j).** The kickback follows one capacitive-divider law over switch sizes, drivers and hold capacitors (within 8%), and a hold capacitor is about 3× more area-efficient than scaling the switch drivers. A linear series-R / shunt-C driver shows that the loss follows the dip's shape rather than the MOS device; the remaining MOS difference comes from the off gates, which a state-aware linear driver reproduces within 0.08 percentage points. A 4× decoder pull-down cuts the hot-corner loss 3–7× and the worst corner from 2.50% to 2.09%, but at equal gate area a larger nfet hold capacitor gives the lower worst corner (1.82%). In 40-seed Monte Carlo (r26j) these rankings hold in 40 of 40 seeds, every fix calibrates to ±1 mV, with no measurable energy cost; with the extracted gate-net coupling the two fixes tie (2.00% and 2.01%), and at four times that coupling the pull-down is the better fix (1.77% against 2.20%).
+- **The limit is the trim, not latch speed.** Every wrong decision lies between zero and the residual offset left by calibration (303/303); the selected design keeps more than 1 mV of residual in 20 of 49 conditions.
+- **Two redesigned trims pass ±1 mV in all 49 conditions.** `unit6_w6` at 1 and 2 ns (760 fJ) and `u6_w12_l05` at 0.75–2 ns (623 fJ), both with 6-bit unit-cell trims; the shipped design averages 250 fJ at its ≥3 mV band, a different specification. Neither has a layout of its own.
+- **Robust under mismatch.** A segmented trim with a transistor-level decoder passes ±1 mV at 1 ns for 1000/1000 mismatch seeds; its clock kickback is removed by a hold capacitor or a 4× decoder pull-down, and that ranking holds in 40/40 seeds. These counts are noiseless: with 0.71 mV thermal noise at TT, a 10⁻⁶ error rate needs about 4 mV.
 
 See Notebook Section 9 and the [research extension](REPRODUCIBILITY.md#research-extension).
 

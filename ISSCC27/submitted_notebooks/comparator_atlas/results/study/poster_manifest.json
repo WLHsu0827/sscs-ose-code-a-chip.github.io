@@ -7391,9 +7391,9 @@
   "artifact_sha256": {
     "Comparator_Atlas_Poster.pdf": "c86203d8e54bd65b08e419a47c906e8c1325ab91d6b9e58d49d31c3eadb37fa8",
     "poster_preview.png": "04f934b13e3dd3f1a3a04617c24d7213a02494fa07b0d4e3c8c3a16f49d5bdf4",
-    "abstract.txt": "1b10da5307bbfda816358097e6c205e74d25748eb107ec2c13c3dfa030a3fe67"
+    "abstract.txt": "d8629a9e25708d640ac9b1ab74438251c8105118049a99a74a18cce04181b91f"
   },
-  "reviewer_guide_sha256": "7848380906143c01e969c8f73b04cf42bcbaa2a8eb4a6c3116c4f236c2365a00",
+  "reviewer_guide_sha256": "29e08797573a597e18392c07811fafcf37f0b611ca3610206f9f563c7bd38724",
   "presentation": {
     "page_inches": [
       24,

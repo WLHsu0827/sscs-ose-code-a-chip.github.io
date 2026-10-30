@@ -560,29 +560,20 @@ def main(support_digest: str | None = None) -> None:
         markdown("""
         ### Waveform lab: wrong, late, or correct?
 
-        RC examples illustrate archived-deck outcomes, not a qualified
-        physical model; see Section 8. Changing the display does not
-        resolve the extraction-model limitation.
-
-        The two saved figures and reading tables below compare the untrimmed
-        and calibrated schematic examples at **1.0 ns**, without widget
-        JavaScript. They reuse existing traces and the same measurement
-        contract: no new simulations or validation coverage.
-
-        The interactive controls follow these static examples and explore
-        all eight representative saved SPICE waveforms. Compare the
-        complementary output rails with the selected deadline.
-
         Start with the **code-zero -1 mV schematic example**: its outputs
         resolve to the wrong polarity. Switch to the same circuit and
         input with calibration enabled, then to a cold-SS extracted RC
         example. At 1 ns that RC trace is late; reading its saved 2 ns
         observation does not retroactively pass the original 1 ns gate.
 
-        Horizontal dotted lines are the fixed 80% / 20% output rail
-        thresholds. The two cursor voltages, not only their difference,
-        determine whether the decision is valid. Core energy always
-        covers the complete saved 10 ns cycle.
+        The two static figures and tables below show the untrimmed and
+        calibrated schematic examples at **1.0 ns**; the interactive
+        controls that follow explore all eight saved SPICE waveforms with
+        the same measurement rules (no new simulations). Dotted lines are
+        the fixed 80% / 20% output-rail thresholds: both cursor voltages,
+        not only their difference, decide validity. Core energy covers the
+        complete saved 10 ns cycle. RC examples come from the archived
+        extraction decks (see Section 10, Limitations).
         """),
         code("""
         from presentation import waveform_lab
@@ -662,45 +653,34 @@ def main(support_digest: str | None = None) -> None:
         markdown("""
         ## 8. Adopted local-pitch b1 version
 
-        The adopted 27-MOS, 15-port b1 layout has a 110 x 17.03 um
-        all-material GDS bbox (1873.3 um2), versus matched adopted a1's
-        121.8 x 17.03 um (2074.254 um2): **9.688013% less area**.
-        Wells, body ties, guards and shields are included; only TEXT is excluded.
-        Fixed local intervals are 3.8/4.2 um; pair order, mirroring, vertical placement, device WL/flavors,
-        junctions and local M1/M2 escapes remain unchanged. Only necessary
-        horizontal bus/output/shield endpoints and symmetric spines follow
-        placements. There is no diffusion sharing or matching-benefit claim.
+        **Result.** The adopted b1 layout is **9.69% smaller** than a1
+        (110 x 17.03 um, 1873.3 um2, against 121.8 x 17.03 um, 2074.254 um2;
+        all-material GDS bbox including wells, ties, guards and shields) and
+        loses no decision. On a nominal code-zero grid of 45 PVT conditions
+        and signed +/-3 and +/-10 mV inputs (180 points per layout and mode),
+        every point is correct at the 2 ns primary deadline in both layouts.
+        At 1 ns, C-only stays at 170 correct / 10 unresolved; RC goes from
+        156 correct / 24 unresolved (a1) to 158 / 22 (b1), the gain only at
+        SS / 1.62 V / 125 C / +/-10 mV. No previously correct point is lost.
+        All 180 matched energies and 2 ns latencies decrease, by about 1.9%
+        in both C-only and RC mean energy.
 
-        **Archived RC-deck outcomes; model physical fidelity not yet qualified.**
-        The candidate passed 14 native checks on one actual DRC attempt in its
-        earlier spacing round; both unchanged a1/b1 native proofs/extracts were
-        reused, not rerun. Full45 qualification and publication added no native runs.
-        New local planning margins are at least 0.20 um; unchanged inherited
-        global M3 margin is 0.16 um. Pre-route restored MAG is not final routed MAG.
-        The subsequent nominal code-zero grid used both layouts, C and RC,
-        45 PVT conditions, signed +/-3 and +/-10 mV inputs, and 10/5 ps steps:
-        **1440 transients and 720 qualified pairs**, with 180 points per
-        layout and mode. The conditions were known before qualification.
-        All points are correct at the fixed 2 ns primary deadline.
-        At 1 ns, C-only retains 170 correct / 10 unresolved points.
-        RC changes from 156 correct / 24 unresolved to 158 correct / 22 unresolved,
-        only at SS / 1.62 V / 125 C / +/-10 mV, not FS. No previously correct
-        point is lost; unresolved latency stays null.
+        **What changed.** The 27-MOS, 15-port b1 keeps a1's pair order,
+        mirroring, vertical placement, device sizes, junctions and local
+        M1/M2 escapes; only the local pitch (3.8/4.2 um) and the horizontal
+        bus, output and shield endpoints that follow it change. There is no
+        diffusion sharing or matching-benefit claim. Local planning margins
+        are at least 0.20 um; the inherited global M3 margin is 0.16 um.
 
-        All 180 matched energies and recorded 2 ns latencies decrease in
-        each mode. Ratio-of-mean energy changes are -1.923720% for C-only and
-        -1.939286% for RC; mean per-point changes are -1.932155% and -1.945659%.
-        These are different estimators. There are 720 finest 5 ps traces and
-        1440 two-deadline rows, not 1440 finest independent experiments.
-        Fresh control readings agree exactly with archived adopted-a1 readings.
-        These decreases are numerically consistent in the
-        recorded decks, but their physical accuracy is unknown.
-        The declared 1% energy / 20 ps latency criteria are numerical acceptance
-        bands, **not uncertainty bounds**. No robust global PPA, yield, silicon,
-        independently qualified PEX or signoff conclusion follows. Core energy excludes
-        drivers/controller/calibration. C-only is not independent ground truth.
-        This is not the calibrated 49-condition width-stress study, nor a
-        post-layout calibration, noise or mismatch qualification.
+        **How it was checked.** 1440 transients (both layouts, C and RC,
+        10/5 ps steps) form 720 qualified pairs; the PVT conditions were
+        known before qualification. b1 passed 14 native checks on one DRC
+        attempt; the a1/b1 native proofs and extracts were reused, not
+        rerun. The restored pre-route MAG is not the final routed MAG. Fresh control readings match the archived a1 readings
+        exactly. The 1% energy / 20 ps latency acceptance criteria are
+        numerical bands, **not uncertainty bounds**, and C-only is not
+        independent ground truth. Physical-fidelity limits of the RC decks
+        are stated with the original control below and in Section 10.
 
         [Versioned raw traces, native geometry, pins and audit recipe](layout_single_row/v2/README.md)
         and the unchanged [historical a1 version](layout_single_row/v1/README.md)
@@ -923,16 +903,17 @@ def main(support_digest: str | None = None) -> None:
         > loaded from a hash-checked archive; commands and runtimes are in
         > [Reproducibility](REPRODUCIBILITY.md#research-extension).
 
-        **Headline result.** The original three-design atlas returns NONE at
-        1 mV, but two later designs qualify at ±1 mV across all 49
-        deterministic conditions. `unit6_w6` (r15b: 6-bit unit trim, input
-        W = 6 µm) does so at 1 and 2 ns at 760 fJ mean core energy;
-        `u6_w12_l05` (r19: the same trim built from 0.5 µm-long units, input
-        W = 12 µm) does so at 0.75, 1 and 2 ns at 623 fJ. Neither has a layout
-        of its own. On an RC estimate from the archived extraction both keep
-        ±1 mV correct at 2 ns; at 1 ns `u6_w12_l05` gets 78/90 and
-        `unit6_w6` 69/90 (r17, r19). The rest of this section explains why
-        the original designs stop short, and what failed along the way.
+        **Section summary.** Each row is detailed below; r-numbers label the
+        archived study runs.
+
+        | Question | Finding | Runs |
+        |---|---|---|
+        | Why does the atlas return NONE at 1 mV? | Every wrong decision lies between zero and the calibration residual offset (303/303); the limit is the trim, not latch speed | law, prospective test |
+        | Can a redesigned trim reach ±1 mV? | Yes: `unit6_w6` at 1 and 2 ns (760 fJ) and `u6_w12_l05` at 0.75–2 ns (623 fJ), all 49 conditions; no layout of their own | r15b, r17, r19 |
+        | Does the original selection survive model and mismatch checks? | Yes; the selection is unchanged under an exact current skew | r20–r22 |
+        | How large is thermal noise? | 0.71 mV input-referred at TT; ±1 mV counts are noiseless, a 10⁻⁶ error rate needs about 4 mV | r23, r24 |
+        | Does the fix hold under mismatch? | Unit-cell trims pass ±1 mV at 1 ns for 978–999/1000 seeds; a segmented trim with a transistor-level decoder passes 1000/1000 | r24c–r26f |
+        | What limits the segmented trim? | Clock kickback onto the decoder gates; a hold capacitor or a 4× pull-down removes it, ranking held in 40/40 seeds | r26g–r26j |
 
         **Question.** Section 4 finds *no feasible compared design* at
         input bands of 1 mV or below, at every deadline. Is that a latch-speed
@@ -1792,85 +1773,55 @@ def main(support_digest: str | None = None) -> None:
         markdown("""
         ## 10. Discussion and limitations
 
-        This discussion summarizes the sealed Sections 1–8 record. Section 9
-        is a separate later schematic extension and reports the `unit6_w6`
-        and `u6_w12_l05` results and their additional limitations. It also
-        reruns the comparison below with an exact, bin-neutral current skew
-        (r21); the selection does not change. Its r22 Monte Carlo shows that
-        the selected design's trim does not cover two ~3σ seeds at
-        1.95 V 125 °C, which `lvt_base_3b` also misses. Its r23 noise runs
-        show that the ±1 mV counts are noiseless: with transient thermal
-        noise (σn ≈ 0.7 mV at TT) a 10⁻⁶ error rate needs about 4 mV. Its
-        r24 impulse-sensitivity measurement reproduces those noise runs
-        realization by realization and maps σn over 45 PVT conditions
-        (0.35–1.21 mV); its r24c follow-up traces a 7.5 µV decision memory
-        to floating trim nodes and removes it with one equalizing switch per
-        bit at 3% energy, which does not, however, recover the two ~3σ seeds.
-        Its r25 5-bit trim with the equalizer does cover them (all 40 seeds
-        at both hot corners, ±3 mV 80/80) at 55% more energy, with ±1 mV
-        about unchanged (68/80 and 71/80). Its r26b unit-cell trim, with
-        the input pair widened 1.5×, makes the trim weights binary at all
-        corners and reaches ±1 mV for 240/240 paired decisions at the hot
-        corners and TT, at 4.8% more energy than r25. At 200 seeds and
-        five conditions (r26c) that design passes ±1 mV at 1 ns for 978 of
-        1000 seeds, losing at the cold corners; building its equalizer from
-        unit cells as well raises this to 996 of 1000 for 7.3% more energy.
-        Widening the input pair to 1.75× (r26d) gives 999 of 1000 for 3.2%
-        more, a gain not statistically resolved; the remaining miss is a
-        random carry step. With three thermometer MSBs (r26e) the 15- and
-        31-cell carries disappear, all 1000 seeds pass at the same energy,
-        and steps above 2 mV fall 3.3× (3.6× predicted by the step law).
-        r26f finds those steps Gaussian with a 0.53%-per-cell carry drift,
-        and replaces the ideal decoder with CMOS gates: no measurable
-        energy, monotonic, segments 1.5–4.7% weaker through clock-edge
-        gate kickback (removed by a 4 µm MOS capacitor per segment gate),
-        and 1000/1000 paired seeds still pass. r26g reduces the kickback to
-        one capacitive-divider law across switch sizes, drivers and hold
-        capacitors, and finds the hold capacitor about 3× more
-        area-efficient than scaling the switch drivers; r26h shows with a
-        linear driver that this follows from the shape of the dip, and traces
-        the remaining MOS difference to the off gates' strong pull-down and
-        depleted MOS capacitor; r26i turns this into a cheap pull-down fix
-        for the hot corners, while a larger nfet hold capacitor remains the
-        most area-efficient fix for the worst corner. r26j keeps these
-        rankings in all 40 Monte Carlo seeds at no measurable energy cost
-        (nominal gate net); with the extracted gate net the two fixes tie,
-        and the pull-down gains once the net couples more strongly than the
-        b1 extraction.
-
-        Under the same local calibration policy, the selected circuit
-        increases 1 ns correct decisions from 310/392 to 372/392 across
-        the 49 listed schematic conditions, while mean core energy rises
-        from 143.01 to 251.53 fJ/cycle. The post-selection lower-energy
+        **Conclusion.** Under the same local calibration policy, the selected
+        circuit increases 1 ns correct decisions from 310/392 to 372/392
+        across the 49 listed schematic conditions, while mean core energy
+        rises from 143.01 to 251.53 fJ/cycle. The post-selection lower-energy
         control reaches 351/392 at 156.65 fJ/cycle. Neither design
-        dominates both measured correctness and core energy.
+        dominates both measured correctness and core energy, which is why
+        the atlas asks for an input band first and ranks energy second.
 
         The separate nominal, code-zero layout study records 156/180
         correct RC decisions at 1 ns and 180/180 at its declared 2 ns
-        deadline. These are results of the archived extraction decks,
-        whose physical fidelity remains unqualified; they are not
-        silicon predictions or an isolated measure of resistance.
+        deadline. A [two-point RC-card sensitivity check](REPRODUCIBILITY.md#bounded-rc-sensitivity-check)
+        (28 transients, hypothetical R/C scaling) shows the margin is thin:
+        at the slowest archived FS point, C x 1.2 makes the 2 ns decision
+        unresolved. A [GDS geometry check](results/study/gds_geometry/README.md)
+        restores the interface and measures selected conductor dimensions.
 
-        A subsequent [two-point RC-card sensitivity check](REPRODUCIBILITY.md#bounded-rc-sensitivity-check)
-        reran 28 transients with hypothetical R/C scaling. At the slowest
-        archived FS point, C x 1.2 makes the 2 ns decision unresolved.
-        This is neither a measured process-error bound nor a new full-grid
-        pass rate. A separate [GDS geometry check](results/study/gds_geometry/README.md)
-        restores the interface and measures selected conductor dimensions;
-        imported RC still differs from the MAG extraction. Its isolated
-        sheet/plate components are not whole-net parasitic estimates.
+        **What Section 9 adds.** The NONE at ±1 mV is a trim limit, not a
+        speed limit; redesigned unit-cell and segmented trims pass ±1 mV in
+        all 49 conditions and under mismatch Monte Carlo, the original
+        selection survives an exact current-skew rerun, and the ±1 mV counts
+        are noiseless (about 4 mV is needed for a 10⁻⁶ error rate at TT).
 
-        - Results are deterministic SKY130 simulations. Width perturbations
-          are controlled stress, not a foundry mismatch distribution or yield.
-        - Candidate selection was a finite design comparison; the
-          post-selection control and previously observed PVT conditions
-          do not form a blinded external validation set.
-        - The 49-condition calibrated schematic study, earlier five-condition
-          layout experiment and full 45-condition nominal code-zero study
-          have separate conditions and recorded tool identities.
-        - Core-rail energy excludes input/clock drivers and calibration
-          infrastructure. DRC/LVS do not establish silicon performance or
-          complete foundry signoff.
+        **Limitations.**
+
+        - *Simulation, not silicon.* Results are deterministic SKY130
+          simulations. Width perturbations are controlled stress, not a
+          foundry mismatch distribution or yield; Section 9's Monte Carlo
+          seeds are not a yield estimate either.
+        - *Archived RC decks.* Layout results come from archived extraction
+          decks whose physical fidelity remains unqualified; they are not
+          silicon predictions or an isolated measure of resistance. Imported
+          RC still differs from the MAG extraction, and isolated sheet/plate
+          components are not whole-net parasitic estimates. The sensitivity
+          check is neither a measured process-error bound nor a new
+          full-grid pass rate.
+        - *Finite, post-hoc comparison.* Candidate selection compared a
+          finite set of designs at sampled inputs; it is not continuous
+          coverage or a global optimum. The post-selection control and
+          previously observed PVT conditions do not form a blinded external
+          validation set, and energies from different input bands are not a
+          same-specification improvement.
+        - *Separate populations.* The 49-condition calibrated schematic
+          study, earlier five-condition layout experiment and full
+          45-condition nominal code-zero study have separate conditions and
+          recorded tool identities. Section 9 designs have no layout of
+          their own.
+        - *Energy scope.* Core-rail energy excludes input/clock drivers and
+          calibration infrastructure. DRC/LVS do not establish silicon
+          performance or complete foundry signoff.
 
         See [Reproducibility](REPRODUCIBILITY.md) for tool versions, commands,
         numerical criteria and the locations of layouts, waveforms and logs.

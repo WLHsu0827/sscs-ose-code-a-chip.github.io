@@ -24,12 +24,11 @@ DISCLOSURE = ("GitHub Copilot assisted implementation, experiment automation, fi
 LEDE = ("Which compared SKY130 StrongARM design is correct at every included sampled point "
         "before the deadline? Specify the input band, inspect failures, then compare mean "
         "energy among qualified designs. If none qualifies, the answer is NONE.")
-OPENING = """Which SKY130 StrongARM comparator meets your sampled input band and deadline?
-Calibration alone does not ensure a correct decision on time. Comparator Atlas lets you
-compare three designs using saved schematic measurements: choose a specification, inspect
-correct, wrong and unresolved outcomes, and trace failures to their exact records.
-Rank mean energy only after every included point qualifies. If none does, return NONE,
-not the best average."""
+OPENING = """Which SKY130 StrongARM comparator decides correctly, before the deadline, at every
+sampled condition in your input band? Comparator Atlas compares three calibrated designs on
+saved schematic measurements: choose a band and a deadline, inspect every correct, wrong and
+unresolved decision, and rank energy only among designs with no failure. If none qualifies,
+the answer is NONE, not the best average."""
 SYSTEM_OVERVIEW = """**System at a glance.** Inputs enter at the top; the selector at the bottom returns the answer.
 
 ```text
@@ -68,59 +67,31 @@ SYSTEM_OVERVIEW = """**System at a glance.** Inputs enter at the top; the select
 - **Extension** (Section 9): the residual m explains every wrong decision, so later studies redesign the trim
   (unit cells, a segmented decoder) until ±1 mV qualifies."""
 
+MAIN_RESULT = """**Main result (Sections 4–8).** At a 1 ns deadline over all 49 schematic conditions:
+
+| Sampled input band | Strict choice | Correct / included points | Mean core energy |
+|---|---|---|---|
+| ≥1 mV | NONE | no design is correct at every point | — |
+| ≥3 mV | `lvt_balanced_4b` (selected) | 294/294 | 250 fJ |
+| ≥30 mV | `lvt_base_3b` (lower-energy control) | 98/98 | 151 fJ |
+
+Against the baseline, the selected design raises 1 ns correct decisions from 310 to 372 of 392 at 252 fJ
+instead of 143 fJ. The separate archived layout study (nominal, code zero) is correct at 156/180 RC points at 1 ns and
+180/180 at 2 ns."""
+
 EXTENSION_SUMMARY = (
-    "**Why NONE at 1 mV? (Section 9, later extension.)** Later schematic studies, kept separate from the "
-    "sealed record, find the cause and designs that do qualify:\n\n"
-    "- **Cause: the trim, not latch speed.** Every wrong decision lies between zero and the static "
-    "post-calibration residual offset (303/303, no misses, four observed-correct false positives), and sealed "
-    "predictions for six new designs matched 97.9% of 10,584 held-out decisions. The binary array's major-carry "
-    "step limits first; once unit elements remove it, the trim range does (a 5-bit unit trim saturates in 11 of "
-    "49 conditions).\n"
-    "- **Two designs that qualify (r15b, r19).** In the finite 49-condition schematic atlas, two 6-bit unit-trim "
-    "designs, each tested with sealed predictions, pass ±1 mV (98/98 decisions per deadline): `unit6_w6` (input "
-    "W = 6 µm) at 1 and 2 ns with 760 fJ mean core energy, and `u6_w12_l05` (input W = 12 µm, half-length trim "
-    "elements, chosen after an energy screen) at 0.75, 1 and 2 ns with 623 fJ. The shipped design needs a ≥3 mV "
-    "band and averages 250 fJ there; these are different specifications, not a same-specification energy "
-    "comparison. Paired mismatch Monte Carlo (40 seeds at each of two conditions; not a yield estimate) keeps the "
-    "residual within 0.59 mV and 0.82 mV. Neither design has a layout of its own; an RC estimate on the archived "
-    "extraction keeps ±1 mV correct at 2 ns but not at 1 ns (69/90 and 78/90 at code 0; misses are unresolved, "
-    "none wrong).\n"
-    "- **The original selection holds (r20–r22).** The atlas width skew is not design-neutral under the PDK's "
-    "width-binned models; rerun with an exact 4% current skew, the three-design selection is unchanged. At "
-    "1.95 V 125 °C the shipped trim covers 38/40 mismatch seeds; the two ~3σ seeds it misses are also missed by "
-    "`lvt_base_3b`.\n"
-    "- **Noise (r23, r24).** With transient thermal noise (white BSIM4 noise, no flicker) the shipped design has "
-    "0.71 mV input-referred noise at TT, so its ±1 mV results are noiseless counts rather than low error rates; a "
-    "10⁻⁶ error rate needs about 4 mV at TT and 7 mV at SF 1.95 V 125 °C. A measured impulse sensitivity of the "
-    "decision reproduces those noise runs realization by realization, maps the noise over 45 PVT conditions "
-    "(0.35–1.21 mV) and shows that it follows the input pair's inversion level, so the input common mode is a "
-    "noise knob.\n"
-    "- **Trim memory and range (r24c, r25).** A causal probe traces a 7.5 µV decision memory to the trim's "
-    "floating nodes; one equalizing switch per bit removes it at 3% energy but does not recover the two "
-    "hot-corner seeds. A fifth trim bit with the equalizer covers all 40 seeds at both hot corners at 55% more "
-    "energy, with ±1 mV about unchanged (68 and 71/80), because that is limited by the ~2 mV trim step.\n"
-    "- **Unit-cell trim (r26b–r26d).** Building each bit from identical unit cells makes the weights binary at "
-    "every corner; with the input pair widened 1.5×, ±1 mV reaches 240/240 paired decisions at SF, FF and TT "
-    "for 4.8% more energy than r25. At 200 seeds over five conditions it passes ±1 mV at 1 ns for 978/1000 "
-    "seeds, losing at the cold corners to the per-bit equalizer kept from r24c; a unit-cell equalizer gives "
-    "996/1000 with no unresolved decision (+7.3% energy), and a 1.75× input pair 999/1000 (+3.2%, not "
-    "statistically resolved). The remaining miss follows a binary carry law, step sd = √(σ0² + (2^j − 1)σu²) "
-    "with σu ≈ 0.1 mV per unit cell, which predicts that thermometer-coded MSBs would remove it.\n"
-    "- **Segmented trim with a real decoder (r26e, r26f).** With three thermometer MSBs (ideal decoder) the trim "
-    "passes 1000/1000 at the same energy and its steps above 2 mV fall 3.3× (3.6× predicted); the steps are "
-    "Gaussian with a 0.53%-per-cell carry drift. A transistor-level CMOS decoder adds no measurable energy, keeps "
-    "the transfer monotonic and still passes 1000/1000 on 200 paired seeds at each of the five conditions, but "
-    "clock-edge gate kickback weakens the segments 1.5–4.7%; a 4 µm MOS hold capacitor per segment gate "
-    "removes it.\n"
-    "- **Kickback law and its fixes (r26g–r26j).** The kickback follows one capacitive-divider law over switch "
-    "sizes, drivers and hold capacitors (within 8%), and a hold capacitor is about 3× more area-efficient than "
-    "scaling the switch drivers. A linear series-R / shunt-C driver shows that the loss follows the dip's shape "
-    "rather than the MOS device; the remaining MOS difference comes from the off gates, which a state-aware "
-    "linear driver reproduces within 0.08 percentage points. A 4× decoder pull-down cuts the hot-corner loss "
-    "3–7× and the worst corner from 2.50% to 2.09%, but at equal gate area a larger nfet hold capacitor gives "
-    "the lower worst corner (1.82%). In 40-seed Monte Carlo (r26j) these rankings hold in 40 of 40 seeds, every fix calibrates to ±1 mV, with no "
-    "measurable energy cost; with the extracted gate-net coupling the two fixes tie (2.00% and 2.01%), and at "
-    "four times that coupling the pull-down is the better fix (1.77% against 2.20%).")
+    "**Why NONE at 1 mV, and what fixes it (Section 9, a later schematic extension; Sections 1–8 are "
+    "unchanged).**\n\n"
+    "- **The limit is the trim, not latch speed.** Every wrong decision lies between zero and the residual "
+    "offset left by calibration (303/303); the selected design keeps more than 1 mV of residual in 20 of 49 "
+    "conditions.\n"
+    "- **Two redesigned trims pass ±1 mV in all 49 conditions.** `unit6_w6` at 1 and 2 ns (760 fJ) and "
+    "`u6_w12_l05` at 0.75–2 ns (623 fJ), both with 6-bit unit-cell trims; the shipped design averages 250 fJ "
+    "at its ≥3 mV band, a different specification. Neither has a layout of its own.\n"
+    "- **Robust under mismatch.** A segmented trim with a transistor-level decoder passes ±1 mV at 1 ns for "
+    "1000/1000 mismatch seeds; its clock kickback is removed by a hold capacitor or a 4× decoder pull-down, "
+    "and that ranking holds in 40/40 seeds. These counts are noiseless: with 0.71 mV thermal noise at TT, a "
+    "10⁻⁶ error rate needs about 4 mV.")
 
 
 def sha(path):
@@ -277,25 +248,23 @@ def integrate_notebook(notebook):
         "(https://colab.research.google.com/github/WLHsu0827/"
         "sscs-ose-code-a-chip.github.io/blob/wlhsu0827-comparator-atlas-isscc27/"
         "ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb)\n\n"
-        + OPENING + "\n\n" + SYSTEM_OVERVIEW + "\n\n" + EXTENSION_SUMMARY + "\n\n## Three-minute route\n\n"
-        "Choose one of the three 1 ns presets in Section 4; inspect exact failing keys; "
-        "separate the schematic decision lesson from the b1/a1 archived-layout result in Section 8. "
+        + OPENING + "\n\n" + MAIN_RESULT + "\n\n" + SYSTEM_OVERVIEW + "\n\n" + EXTENSION_SUMMARY
+        + "\n\n## Three-minute route\n\n"
+        "1. Section 4: pick a 1 ns preset and inspect the exact failing keys.\n"
+        "2. Section 8: read the archived-layout result separately from the schematic decision.\n"
+        "3. Section 9: see why ±1 mV fails and which trims fix it.\n\n"
         "[Self-contained report](results/study/report.html), [quick tour](REVIEWER_GUIDE.md), "
-        "[reproducibility and dated execution scope](REPRODUCIBILITY.md).\n\n"
-        "The post-hoc schematic comparison uses local_boundary calibration, all 49 "
-        "controlled-width-stress conditions and both signed finite sampled inputs through 30 mV. "
-        "It is not continuous coverage or a global optimum. Energies from different input bands "
-        "are not a same-specification improvement.\n\n"
-        "Download the HTML and open it locally: GitHub's file viewer does not run its controls. "
-        "Default execution verifies supplied evidence and remeasures saved waveforms, not new simulations. "
-        "The bootstrap retrieves the submitted GitHub source when needed, stops with an explanation "
-        "if those support files are not the release this Notebook was generated with, "
-        "and installs only the runtime pins from requirements-review.txt "
-        "(never the pytest/nbmake/ipykernel running it). "
-        "Optional RUN_LIVE_SPICE and RUN_FULL_CAMPAIGN require the explicit tools/models "
-        "described in Reproducibility; both are false by default.\n\n"
-        f"**{WARNING}**. StrongARM and calibration are established; this finite comparison "
-        "is not a new topology or physical PPA/signoff claim.\n\n" + DISCLOSURE)
+        "[reproducibility and dated execution scope](REPRODUCIBILITY.md). "
+        "Download the HTML and open it locally: GitHub's file viewer does not run its controls.\n\n"
+        "**Running it.** Default execution verifies supplied evidence and remeasures saved waveforms, "
+        "not new simulations. The bootstrap retrieves the submitted GitHub source when needed, "
+        "stops with an explanation if those support files are not the release this Notebook was "
+        "generated with, and installs only the runtime pins from requirements-review.txt. "
+        "RUN_LIVE_SPICE and RUN_FULL_CAMPAIGN (both false by default) need the tools and models "
+        "described in Reproducibility.\n\n"
+        f"**Scope.** {WARNING}. StrongARM and calibration are established circuits; this is a finite "
+        "sampled comparison, not a new topology, a global optimum or a signoff claim. All limitations "
+        "are collected in Section 10.\n\n" + DISCLOSURE)
     notebook.cells[8].source = """import ipywidgets as widgets
 from presentation.judge_decision import notebook_view
 
