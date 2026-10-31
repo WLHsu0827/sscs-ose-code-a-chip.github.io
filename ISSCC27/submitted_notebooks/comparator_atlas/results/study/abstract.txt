@@ -1,11 +1,17 @@
 Comparator Atlas: correct before the deadline - or NONE?
 Wei-Lun Hsu - National Tsing Hua University
 
-Which SKY130 StrongARM comparator decides correctly, before the deadline, at every
-sampled condition in your input band? Comparator Atlas compares three calibrated designs on
-saved schematic measurements: choose a band and a deadline, inspect every correct, wrong and
-unresolved decision, and rank energy only among designs with no failure. If none qualifies,
-the answer is NONE, not the best average.
+Why can't a calibrated SKY130 StrongARM comparator resolve ±1 mV in 1 ns, and what fixes it?
+Comparator Atlas answers with three reusable pieces, built only with open tools (ngspice, Magic, Netgen):
+
+1. A strict selection rule. Choose an input band and a deadline. A design qualifies only if it decides
+   correctly, in time, at every sampled condition; only then is energy ranked. If none qualifies, the answer
+   is NONE, not the best average, and every failure links to its exact measurement record.
+2. A one-line failure law. Every wrong decision lies between zero and the residual offset m left by
+   calibration (0 < v/m < 1 flags 303/303). NONE at 1 mV is therefore a trim limit, not a latch-speed limit;
+   sealed predictions built on this law matched 97.9% of 10,584 held-out decisions.
+3. A trim that fixes it. Redesigned 6-bit unit-cell trims pass ±1 mV at all 49 conditions, and a
+   segmented trim with a transistor-level decoder passes it at 1 ns for 1000/1000 mismatch seeds.
 
 A declared nine-candidate sizing comparison is followed by a lower-energy control and a nominal 27-device layout. For three locally calibrated schematic designs, a post-hoc strict specification map uses all 49 controlled-width-stress conditions and both signs at the included finite sampled inputs through 30 mV. At 1 ns, no compared design qualifies for the >=1 mV band. For >=3 mV, lvt_balanced_4b gives 294/294 correct at 249.655 fJ mean core energy; for >=30 mV, lvt_base_3b gives 98/98 at 150.531 fJ. Different input bands are different specifications, not a same-specification energy improvement. Qualification requires every included point to be correct before mean energy ranks designs; the original training selection is unchanged. The selected design retains the same 20 wrong keyed samples at 1 ns and 2 ns, all at +/-1 mV; their locations do not establish a physical failure cause. Later schematic extension (Notebook Section 9; not part of the sealed three-design record): two 6-bit unit-element trim designs qualify across the 49-condition atlas at +/-1 mV - unit6_w6 (input W = 6 um) at 1 and 2 ns at 760 fJ, and u6_w12_l05 (input W = 12 um, half-length trim elements) at 0.75, 1 and 2 ns at 623 fJ mean core energy. Neither has a dedicated layout; an RC estimate on the archived extraction keeps +/-1 mV correct at 2 ns but not at 1 ns, and their paired 40-seed-per-condition threshold-mismatch study is not a yield estimate.
 

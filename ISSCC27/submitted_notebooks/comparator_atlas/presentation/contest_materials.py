@@ -260,7 +260,7 @@ def build() -> Path:
     plt.close(figure)
     abstract = (
         f"{PRESENTATION_TITLE}\n{author['name']} - {author['affiliation']}\n\n"
-        + OPENING + "\n\n"
+        + OPENING.replace("**", "") + "\n\n"
         "A declared nine-candidate sizing comparison "
         "is followed by a lower-energy control and a nominal 27-device layout. "
         "For three locally calibrated schematic designs, a post-hoc strict specification "

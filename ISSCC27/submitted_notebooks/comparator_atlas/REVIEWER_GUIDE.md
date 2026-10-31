@@ -1,6 +1,6 @@
 # Comparator Atlas: correct before the deadline - or NONE?
 
-**SKY130 StrongARM comparators | sampled design decisions**
+**SKY130 StrongARM comparators | why ±1 mV fails, and a trim that fixes it**
 
 **Wei-Lun Hsu - National Tsing Hua University**
 
@@ -8,11 +8,17 @@ IEEE SSCS Code-a-Chip - ISSCC 2027 | Original code: MIT
 
 [Notebook](Comparator_Atlas.ipynb) | [Quick tour](REVIEWER_GUIDE.md) | [Reproduction](REPRODUCIBILITY.md) | [Run in Colab](https://colab.research.google.com/github/WLHsu0827/sscs-ose-code-a-chip.github.io/blob/wlhsu0827-comparator-atlas-isscc27/ISSCC27/submitted_notebooks/comparator_atlas/Comparator_Atlas.ipynb)
 
-Which SKY130 StrongARM comparator decides correctly, before the deadline, at every
-sampled condition in your input band? Comparator Atlas compares three calibrated designs on
-saved schematic measurements: choose a band and a deadline, inspect every correct, wrong and
-unresolved decision, and rank energy only among designs with no failure. If none qualifies,
-the answer is NONE, not the best average.
+Why can't a calibrated SKY130 StrongARM comparator resolve ±1 mV in 1 ns, and what fixes it?
+Comparator Atlas answers with three reusable pieces, built only with open tools (ngspice, Magic, Netgen):
+
+1. **A strict selection rule.** Choose an input band and a deadline. A design qualifies only if it decides
+   correctly, in time, at every sampled condition; only then is energy ranked. If none qualifies, the answer
+   is NONE, not the best average, and every failure links to its exact measurement record.
+2. **A one-line failure law.** Every wrong decision lies between zero and the residual offset m left by
+   calibration (0 < v/m < 1 flags 303/303). NONE at 1 mV is therefore a trim limit, not a latch-speed limit;
+   sealed predictions built on this law matched 97.9% of 10,584 held-out decisions.
+3. **A trim that fixes it.** Redesigned 6-bit unit-cell trims pass ±1 mV at all 49 conditions, and a
+   segmented trim with a transistor-level decoder passes it at 1 ns for 1000/1000 mismatch seeds.
 
 **System at a glance.** Inputs enter at the top; the selector at the bottom returns the answer.
 
@@ -52,11 +58,11 @@ the answer is NONE, not the best average.
 - **Extension** (Section 9): the residual m explains every wrong decision, so later studies redesign the trim
   (unit cells, a segmented decoder) until ±1 mV qualifies.
 
-**Why NONE at 1 mV, and what fixes it (Section 9, a later schematic extension; Sections 1–8 are unchanged).**
+**Section 9 in brief (a later schematic extension; Sections 1–8 are unchanged).**
 
-- **The limit is the trim, not latch speed.** Every wrong decision lies between zero and the residual offset left by calibration (303/303); the selected design keeps more than 1 mV of residual in 20 of 49 conditions.
-- **Two redesigned trims pass ±1 mV in all 49 conditions.** `unit6_w6` at 1 and 2 ns (760 fJ) and `u6_w12_l05` at 0.75–2 ns (623 fJ), both with 6-bit unit-cell trims; the shipped design averages 250 fJ at its ≥3 mV band, a different specification. Neither has a layout of its own.
-- **Robust under mismatch.** A segmented trim with a transistor-level decoder passes ±1 mV at 1 ns for 1000/1000 mismatch seeds; its clock kickback is removed by a hold capacitor or a 4× decoder pull-down, and that ranking holds in 40/40 seeds. These counts are noiseless: with 0.71 mV thermal noise at TT, a 10⁻⁶ error rate needs about 4 mV.
+- **Root cause.** The selected design keeps more than 1 mV of calibration residual in 20 of 49 conditions, so a longer deadline cannot help.
+- **Fixed designs.** `unit6_w6` passes ±1 mV at 1 and 2 ns (760 fJ) and `u6_w12_l05` at 0.75–2 ns (623 fJ); the shipped design averages 250 fJ at its ≥3 mV band, a different specification. Neither has a layout of its own.
+- **Robustness.** The segmented trim's clock kickback is removed by a hold capacitor or a 4× decoder pull-down, and that ranking holds in 40/40 seeds. These counts are noiseless: with 0.71 mV thermal noise at TT, a 10⁻⁶ error rate needs about 4 mV.
 
 See Notebook Section 9 and the [research extension](REPRODUCIBILITY.md#research-extension).
 

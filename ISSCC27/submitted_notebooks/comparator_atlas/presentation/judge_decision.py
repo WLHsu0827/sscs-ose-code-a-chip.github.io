@@ -17,18 +17,24 @@ ROOT = entry.ROOT
 STUDY = entry.STUDY
 HEAD = "db82273a5df8b73d39ebf20593309e433d1a1d50"
 LABEL = "Comparator Atlas | finite sampled design decisions"
-SUBTITLE = "SKY130 StrongARM comparators | sampled design decisions"
+SUBTITLE = "SKY130 StrongARM comparators | why ±1 mV fails, and a trim that fixes it"
 WARNING = "Archived RC-deck outcomes; model physical fidelity not yet qualified"
 DISCLOSURE = ("GitHub Copilot assisted implementation, experiment automation, figures and "
               "documentation; the author is responsible for the work.")
 LEDE = ("Which compared SKY130 StrongARM design is correct at every included sampled point "
         "before the deadline? Specify the input band, inspect failures, then compare mean "
         "energy among qualified designs. If none qualifies, the answer is NONE.")
-OPENING = """Which SKY130 StrongARM comparator decides correctly, before the deadline, at every
-sampled condition in your input band? Comparator Atlas compares three calibrated designs on
-saved schematic measurements: choose a band and a deadline, inspect every correct, wrong and
-unresolved decision, and rank energy only among designs with no failure. If none qualifies,
-the answer is NONE, not the best average."""
+OPENING = """Why can't a calibrated SKY130 StrongARM comparator resolve ±1 mV in 1 ns, and what fixes it?
+Comparator Atlas answers with three reusable pieces, built only with open tools (ngspice, Magic, Netgen):
+
+1. **A strict selection rule.** Choose an input band and a deadline. A design qualifies only if it decides
+   correctly, in time, at every sampled condition; only then is energy ranked. If none qualifies, the answer
+   is NONE, not the best average, and every failure links to its exact measurement record.
+2. **A one-line failure law.** Every wrong decision lies between zero and the residual offset m left by
+   calibration (0 < v/m < 1 flags 303/303). NONE at 1 mV is therefore a trim limit, not a latch-speed limit;
+   sealed predictions built on this law matched 97.9% of 10,584 held-out decisions.
+3. **A trim that fixes it.** Redesigned 6-bit unit-cell trims pass ±1 mV at all 49 conditions, and a
+   segmented trim with a transistor-level decoder passes it at 1 ns for 1000/1000 mismatch seeds."""
 SYSTEM_OVERVIEW = """**System at a glance.** Inputs enter at the top; the selector at the bottom returns the answer.
 
 ```text
@@ -80,18 +86,15 @@ instead of 143 fJ. The separate archived layout study (nominal, code zero) is co
 180/180 at 2 ns."""
 
 EXTENSION_SUMMARY = (
-    "**Why NONE at 1 mV, and what fixes it (Section 9, a later schematic extension; Sections 1–8 are "
-    "unchanged).**\n\n"
-    "- **The limit is the trim, not latch speed.** Every wrong decision lies between zero and the residual "
-    "offset left by calibration (303/303); the selected design keeps more than 1 mV of residual in 20 of 49 "
-    "conditions.\n"
-    "- **Two redesigned trims pass ±1 mV in all 49 conditions.** `unit6_w6` at 1 and 2 ns (760 fJ) and "
-    "`u6_w12_l05` at 0.75–2 ns (623 fJ), both with 6-bit unit-cell trims; the shipped design averages 250 fJ "
-    "at its ≥3 mV band, a different specification. Neither has a layout of its own.\n"
-    "- **Robust under mismatch.** A segmented trim with a transistor-level decoder passes ±1 mV at 1 ns for "
-    "1000/1000 mismatch seeds; its clock kickback is removed by a hold capacitor or a 4× decoder pull-down, "
-    "and that ranking holds in 40/40 seeds. These counts are noiseless: with 0.71 mV thermal noise at TT, a "
-    "10⁻⁶ error rate needs about 4 mV.")
+    "**Section 9 in brief (a later schematic extension; Sections 1–8 are unchanged).**\n\n"
+    "- **Root cause.** The selected design keeps more than 1 mV of calibration residual in 20 of 49 "
+    "conditions, so a longer deadline cannot help.\n"
+    "- **Fixed designs.** `unit6_w6` passes ±1 mV at 1 and 2 ns (760 fJ) and `u6_w12_l05` at 0.75–2 ns "
+    "(623 fJ); the shipped design averages 250 fJ at its ≥3 mV band, a different specification. Neither has "
+    "a layout of its own.\n"
+    "- **Robustness.** The segmented trim's clock kickback is removed by a hold capacitor or a 4× decoder "
+    "pull-down, and that ranking holds in 40/40 seeds. These counts are noiseless: with 0.71 mV thermal noise "
+    "at TT, a 10⁻⁶ error rate needs about 4 mV.")
 
 
 def sha(path):

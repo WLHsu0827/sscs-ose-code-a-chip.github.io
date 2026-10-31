@@ -1,6 +1,6 @@
 {
   "status": "current_competition_materials_from_verified_evidence",
-  "generator_sha256": "adddccea085905229203028aeea07e838f16b5235fae3ddfda12e277ddb38efd",
+  "generator_sha256": "da461affac258a288088c8d19eb2941c0a21bc3c53a3b1138549e3220de7c352",
   "release_facts_source_sha256": "cfba7e49cdbbab5a866a786bc93c1c9f6184f526595da7178254c41ac294c010",
   "facts": {
     "authors": [
@@ -7391,9 +7391,9 @@
   "artifact_sha256": {
     "Comparator_Atlas_Poster.pdf": "c86203d8e54bd65b08e419a47c906e8c1325ab91d6b9e58d49d31c3eadb37fa8",
     "poster_preview.png": "04f934b13e3dd3f1a3a04617c24d7213a02494fa07b0d4e3c8c3a16f49d5bdf4",
-    "abstract.txt": "d8629a9e25708d640ac9b1ab74438251c8105118049a99a74a18cce04181b91f"
+    "abstract.txt": "4aba40342068c6bce05ede0a6b54023923f9247c3845a4218d0566f6cd43b3b1"
   },
-  "reviewer_guide_sha256": "29e08797573a597e18392c07811fafcf37f0b611ca3610206f9f563c7bd38724",
+  "reviewer_guide_sha256": "616136691956abc1a38c29bd5eda373599db2e3021277e35efac4c24d65814a1",
   "presentation": {
     "page_inches": [
       24,
